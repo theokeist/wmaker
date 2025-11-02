@@ -232,6 +232,13 @@ static WOptionEnumeration seSpeeds[] = {
 	{NULL, 0, 0}
 };
 
+static WOptionEnumeration seTransitionEffects[] = {
+	{"Classic", WMEFFECT_CURVE_CLASSIC, 0},
+	{"Smooth", WMEFFECT_CURVE_SMOOTH, 0},
+	{"Gentle", WMEFFECT_CURVE_GENTLE, 0},
+	{NULL, 0, 0}
+};
+
 static WOptionEnumeration seMouseButtonActions[] = {
 	{"None", WA_NONE, 0},
 	{"SelectWindows", WA_SELECT_WINDOWS, 0},
@@ -421,6 +428,10 @@ WDefaultEntry optionList[] = {
 	    &wPreferences.menu_scroll_speed, getEnum, NULL, NULL, NULL},
 	{"IconSlideSpeed", "fast", seSpeeds,
 	    &wPreferences.icon_slide_speed, getEnum, NULL, NULL, NULL},
+	{"WindowMovementEffect", "Classic", seTransitionEffects,
+	    &wPreferences.window_movement_effect, getEnum, NULL, NULL, NULL},
+	{"LaunchEffect", "Classic", seTransitionEffects,
+	    &wPreferences.launch_effect, getEnum, NULL, NULL, NULL},
 	{"ShadeSpeed", "fast", seSpeeds,
 	    &wPreferences.shade_speed, getEnum, NULL, NULL, NULL},
 	{"BounceAppIconsWhenUrgent", "YES", NULL,

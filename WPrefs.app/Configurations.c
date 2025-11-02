@@ -216,7 +216,7 @@ static void createPanel(Panel *p)
 		image = RLoadImage(WMScreenRContext(scr), path, 0);
 		wfree(path);
 
-		scaled = RScaleImage(image, 61, 61);
+		scaled = RScaleImageToFit(image, 61, 61, True);
 		icon = WMCreatePixmapFromRImage(scr, scaled, 128);
 		RReleaseImage(scaled);
 		if (icon) {
@@ -224,7 +224,7 @@ static void createPanel(Panel *p)
 			WMReleasePixmap(icon);
 		}
 
-		scaled = RSmoothScaleImage(image, 61, 61);
+		scaled = RSmoothScaleImageToFit(image, 61, 61, True);
 		icon = WMCreatePixmapFromRImage(scr, scaled, 128);
 		RReleaseImage(scaled);
 		if (icon) {

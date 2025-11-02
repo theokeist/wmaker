@@ -87,8 +87,11 @@ typedef struct _Panel {
 		WMLabel *label;
 	} minipreview;
 
-	WMFrame *sizeF;
-	WMPopUpButton *sizeP;
+        struct {
+                WMFrame *frame;
+                WMSlider *slider;
+                WMLabel *valueL;
+        } size;
 
 	int iconPos;
 } _Panel;
@@ -100,6 +103,9 @@ typedef struct _Panel {
  * value WPrefs will consider that the user wants the feature turned off.
  */
 static const int minipreview_minimum_size = 2 * 24 - 1;
+
+static const int icon_size_min = 16;
+static const int icon_size_max = 512;
 
 static const int minipreview_maximum_size = 512;	/* Arbitrary limit for the slider */
 
@@ -145,9 +151,9 @@ static void showIconLayout(WMWidget * widget, void *data)
 
 static void minipreview_slider_changed(WMWidget *w, void *data)
 {
-	_Panel *panel = (_Panel *) data;
-	char buffer[64];
-	int value;
+        _Panel *panel = (_Panel *) data;
+        char buffer[64];
+        int value;
 
 	/* Parameter is not used, but tell the compiler that it is ok */
 	(void) w;
@@ -162,7 +168,25 @@ static void minipreview_slider_changed(WMWidget *w, void *data)
 	else
 		sprintf(buffer, "%i", value);
 
-	WMSetLabelText(panel->minipreview.label, buffer);
+        WMSetLabelText(panel->minipreview.label, buffer);
+}
+
+static void icon_size_slider_changed(WMWidget *w, void *data)
+{
+        _Panel *panel = (_Panel *) data;
+        char buffer[32];
+        int value;
+
+        (void)w;
+
+        value = WMGetSliderValue(panel->size.slider);
+        if (value < icon_size_min)
+                value = icon_size_min;
+        else if (value > icon_size_max)
+                value = icon_size_max;
+
+        snprintf(buffer, sizeof(buffer), _("%d px"), value);
+        WMSetLabelText(panel->size.valueL, buffer);
 }
 
 static void showData(_Panel * panel)
@@ -190,14 +214,13 @@ static void showData(_Panel * panel)
  found_position_value:
 	WMPerformButtonClick(panel->posB[panel->iconPos]);
 
-	i = GetIntegerForKey("IconSize");
-	i = (i - 24) / 8;
-
-	if (i < 0)
-		i = 0;
-	else if (i > 29)
-		i = 29;
-	WMSetPopUpButtonSelectedItem(panel->sizeP, i);
+        i = GetIntegerForKey("IconSize");
+        if (i < icon_size_min)
+                i = icon_size_min;
+        else if (i > icon_size_max)
+                i = icon_size_max;
+        WMSetSliderValue(panel->size.slider, i);
+        icon_size_slider_changed(panel->size.slider, panel);
 
 	/* Mini-Previews for Icons */
 
@@ -240,8 +263,7 @@ static void createPanel(Panel * p)
 	WMScreen *scr;
 	WMColor *color;
 	int i;
-	char buf[16];
-	int swidth, sheight;
+        int swidth, sheight;
 	int width, height;
 	int startx, starty;
 
@@ -328,23 +350,27 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->posF);
 
     /***************** Icon Size ****************/
-	panel->sizeF = WMCreateFrame(panel->box);
-	WMResizeWidget(panel->sizeF, 100, 52);
-	WMMoveWidget(panel->sizeF, 12, 168);
-	WMSetFrameTitle(panel->sizeF, _("Icon Size"));
+        panel->size.frame = WMCreateFrame(panel->box);
+        WMResizeWidget(panel->size.frame, 156, 52);
+        WMMoveWidget(panel->size.frame, 12, 168);
+        WMSetFrameTitle(panel->size.frame, _("Icon Size"));
 
-	WMSetBalloonTextForView(_("The size of the dock/application icon and miniwindows"),
-				WMWidgetView(panel->sizeF));
+        WMSetBalloonTextForView(_("The size of the dock/application icon and miniwindows"),
+                                WMWidgetView(panel->size.frame));
 
-	panel->sizeP = WMCreatePopUpButton(panel->sizeF);
-	WMResizeWidget(panel->sizeP, 80, 20);
-	WMMoveWidget(panel->sizeP, 10, 19);
-	for (i = 24; i <= 256; i += 8) {
-		sprintf(buf, "%ix%i", i, i);
-		WMAddPopUpButtonItem(panel->sizeP, buf);
-	}
+        panel->size.slider = WMCreateSlider(panel->size.frame);
+        WMResizeWidget(panel->size.slider, 109, 15);
+        WMMoveWidget(panel->size.slider, 11, 23);
+        WMSetSliderMinValue(panel->size.slider, icon_size_min);
+        WMSetSliderMaxValue(panel->size.slider, icon_size_max);
+        WMSetSliderAction(panel->size.slider, icon_size_slider_changed, panel);
 
-	WMMapSubwidgets(panel->sizeF);
+        panel->size.valueL = WMCreateLabel(panel->size.frame);
+        WMResizeWidget(panel->size.valueL, 40, 15);
+        WMMoveWidget(panel->size.valueL, 120, 23);
+        WMSetLabelAlignment(panel->size.valueL, WALeft);
+
+        WMMapSubwidgets(panel->size.frame);
 
 	/***************** Mini-Previews ****************/
 	panel->minipreview.frame = WMCreateFrame(panel->box);
@@ -440,7 +466,12 @@ static void storeData(_Panel * panel)
 	SetBoolForKey(WMGetButtonSelected(panel->sclB), "SingleClickLaunch");
 	SetBoolForKey(WMGetButtonSelected(panel->marginB), "EnforceIconMargin");
 
-	SetIntegerForKey(WMGetPopUpButtonSelectedItem(panel->sizeP) * 8 + 24, "IconSize");
+        i = WMGetSliderValue(panel->size.slider);
+        if (i < icon_size_min)
+                i = icon_size_min;
+        else if (i > icon_size_max)
+                i = icon_size_max;
+        SetIntegerForKey(i, "IconSize");
 
 	SetStringForKey(icon_position_dbvalue[panel->iconPos], "IconPosition");
 

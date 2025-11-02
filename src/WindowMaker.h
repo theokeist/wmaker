@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <WINGs/WINGs.h>
+#include <wraster.h>
 
 
 /* class codes */
@@ -176,6 +177,12 @@ typedef enum {
 #define SPEED_MEDIUM	2
 #define SPEED_SLOW	3
 #define SPEED_ULTRASLOW 4
+
+
+/* animation curves */
+#define WMEFFECT_CURVE_CLASSIC R_EFFECT_CURVE_CLASSIC
+#define WMEFFECT_CURVE_SMOOTH  R_EFFECT_CURVE_SMOOTH
+#define WMEFFECT_CURVE_GENTLE  R_EFFECT_CURVE_GENTLE
 
 
 /* window states */
@@ -431,14 +438,18 @@ extern struct WPreferences {
 	/* some constants */
 	int dblclick_time;                 /* double click delay time in ms */
 
-	/* animate menus */
-	signed char menu_scroll_speed;     /* how fast menus are scrolled */
+        /* animate menus */
+        signed char menu_scroll_speed;     /* how fast menus are scrolled */
 
-	/* animate icon sliding */
-	signed char icon_slide_speed;      /* icon slide animation speed */
+        /* animate icon sliding */
+        signed char icon_slide_speed;      /* icon slide animation speed */
 
-	/* shading animation */
-	signed char shade_speed;
+        /* transition curves */
+        signed char window_movement_effect;
+        signed char launch_effect;
+
+        /* shading animation */
+        signed char shade_speed;
 
 	/* bouncing animation */
 	char bounce_appicons_when_urgent;

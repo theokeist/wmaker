@@ -37,6 +37,7 @@ libwraster_la_SOURCES = 	\
 	convert.c 	\
 	context.c 	\
 	misc.c 		\
+	effects.c		\
 	scale.c		\
 	scale.h		\
 	rotate.c	\

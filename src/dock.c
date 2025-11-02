@@ -3301,7 +3301,8 @@ void wDockTrackWindowLaunch(WDock *dock, Window window)
 				XMapWindow(dpy, aicon->icon->core->window);
 				aicon->launching = 1;
 				wAppIconPaint(aicon);
-				slide_window(aicon->icon->core->window, x0, y0, icon->x_pos, icon->y_pos);
+				slide_window_with_curve(aicon->icon->core->window, x0, y0, icon->x_pos, icon->y_pos,
+				                        wPreferences.launch_effect);
 				XUnmapWindow(dpy, aicon->icon->core->window);
 				wAppIconDestroy(aicon);
 			}

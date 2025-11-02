@@ -65,6 +65,12 @@ typedef struct _Panel {
 
 	WMFrame *dragmaxF;
 	WMPopUpButton *dragmaxP;
+
+	WMFrame *effectsF;
+	WMPopUpButton *moveEffectP;
+	WMPopUpButton *launchEffectP;
+	WMLabel *moveEffectL;
+	WMLabel *launchEffectL;
 } _Panel;
 
 #define ICON_FILE "whandling"
@@ -101,6 +107,15 @@ static const struct {
 	{ "RestoreGeometry", N_("...restores its unmaximized geometry")      },
 	{ "Unmaximize",      N_("...considers the window now unmaximized")   },
 	{ "NoMove",          N_("...does not move the window")               }
+};
+
+static const struct {
+	const char *db_value;
+	const char *label;
+} transition_effects[] = {
+	{ "Classic", N_("Classic (legacy acceleration)") },
+	{ "Smooth",  N_("Smooth ease-in/out") },
+	{ "Gentle",  N_("Gentle smoothstep") }
 };
 
 static void sliderCallback(WMWidget * w, void *data)
@@ -195,6 +210,22 @@ static int getDragMaximizedWindow(const char *str)
 	return 0;
 }
 
+static int getTransitionEffect(const char *str)
+{
+	int i;
+
+	if (!str)
+		return 0;
+
+	for (i = 0; i < wlengthof(transition_effects); i++) {
+		if (strcasecmp(str, transition_effects[i].db_value) == 0)
+			return i;
+	}
+
+	wwarning(_("bad option value %s in Window animation. Using default value"), str);
+	return 0;
+}
+
 
 static void showData(_Panel * panel)
 {
@@ -242,6 +273,12 @@ static void showData(_Panel * panel)
 	WMSetButtonSelected(panel->miconB, GetBoolForKey("NoWindowOverIcons"));
 	WMSetButtonSelected(panel->mdockB, GetBoolForKey("NoWindowOverDock"));
 
+	str = GetStringForKey("WindowMovementEffect");
+	WMSetPopUpButtonSelectedItem(panel->moveEffectP, getTransitionEffect(str));
+
+	str = GetStringForKey("LaunchEffect");
+	WMSetPopUpButtonSelectedItem(panel->launchEffectP, getTransitionEffect(str));
+
 	if (GetBoolForKey("Attraction"))
 		WMPerformButtonClick(panel->resrB);
 	else
@@ -271,10 +308,16 @@ static void storeData(_Panel * panel)
 	WMReleasePropList(y);
 	SetObjectForKey(arr, "WindowPlaceOrigin");
 
+	SetStringForKey(transition_effects[WMGetPopUpButtonSelectedItem(panel->moveEffectP)].db_value,
+			"WindowMovementEffect");
+
+	SetStringForKey(transition_effects[WMGetPopUpButtonSelectedItem(panel->launchEffectP)].db_value,
+			"LaunchEffect");
+
 	SetIntegerForKey(WMGetSliderValue(panel->resS), "EdgeResistance");
 
 	SetStringForKey(drag_maximized_window_options[WMGetPopUpButtonSelectedItem(panel->dragmaxP)].db_value,
-	                "DragMaximizedWindow");
+			"DragMaximizedWindow");
 
 	SetIntegerForKey(WMGetSliderValue(panel->resizeS), "ResizeIncrement");
 	SetBoolForKey(WMGetButtonSelected(panel->resrB), "Attraction");
@@ -576,6 +619,39 @@ static void createPanel(Panel * p)
 		WMAddPopUpButtonItem(panel->dragmaxP, _(drag_maximized_window_options[i].label));
 
 	WMMapSubwidgets(panel->dragmaxF);
+
+    /**************** Transition Effects ****************/
+	panel->effectsF = WMCreateFrame(panel->box);
+	WMResizeWidget(panel->effectsF, 357, 86);
+	WMMoveWidget(panel->effectsF, 8, 228);
+	WMSetFrameTitle(panel->effectsF, _("Window animations"));
+	WMSetBalloonTextForView(_("Choose easing curves for moves and application launches."),
+				WMWidgetView(panel->effectsF));
+
+	panel->moveEffectL = WMCreateLabel(panel->effectsF);
+	WMResizeWidget(panel->moveEffectL, 150, 20);
+	WMMoveWidget(panel->moveEffectL, 10, 20);
+	WMSetLabelText(panel->moveEffectL, _("Move effect:"));
+
+	panel->moveEffectP = WMCreatePopUpButton(panel->effectsF);
+	WMResizeWidget(panel->moveEffectP, 180, 20);
+	WMMoveWidget(panel->moveEffectP, 160, 20);
+
+	panel->launchEffectL = WMCreateLabel(panel->effectsF);
+	WMResizeWidget(panel->launchEffectL, 150, 20);
+	WMMoveWidget(panel->launchEffectL, 10, 46);
+	WMSetLabelText(panel->launchEffectL, _("Launch effect:"));
+
+	panel->launchEffectP = WMCreatePopUpButton(panel->effectsF);
+	WMResizeWidget(panel->launchEffectP, 180, 20);
+	WMMoveWidget(panel->launchEffectP, 160, 46);
+
+	for (i = 0; i < wlengthof(transition_effects); i++)
+		WMAddPopUpButtonItem(panel->moveEffectP, _(transition_effects[i].label));
+	for (i = 0; i < wlengthof(transition_effects); i++)
+		WMAddPopUpButtonItem(panel->launchEffectP, _(transition_effects[i].label));
+
+	WMMapSubwidgets(panel->effectsF);
 
 	WMRealizeWidget(panel->box);
 	WMMapSubwidgets(panel->box);

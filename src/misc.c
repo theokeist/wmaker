@@ -160,7 +160,7 @@ void move_window(Window win, int from_x, int from_y, int to_x, int to_y)
 /* wins is an array of Window, sorted from left to right, the first is
  * going to be moved from (from_x,from_y) to (to_x,to_y) and the
  * following windows are going to be offset by (ICON_SIZE*i,0) */
-void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int to_y)
+void slide_windows_with_curve(Window wins[], int n, int from_x, int from_y, int to_x, int to_y, signed char curve)
 {
 	time_t time0 = time(NULL);
 	float dx, dy, x = from_x, y = from_y, px, py;
@@ -197,40 +197,49 @@ void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int t
 		dx_is_bigger = 1;
 	}
 
-	if (dx_is_bigger) {
-		px = dx / slide_slowdown;
-		if (px < slide_steps && px > 0)
-			px = slide_steps;
-		else if (px > -slide_steps && px < 0)
-			px = -slide_steps;
-		py = (is_dx_nul ? 0.0F : px * dy / dx);
+	if (curve < WMEFFECT_CURVE_CLASSIC || curve > WMEFFECT_CURVE_GENTLE)
+		curve = WMEFFECT_CURVE_CLASSIC;
+
+	if (curve != WMEFFECT_CURVE_CLASSIC) {
+		int last_ix = from_x;
+		int last_iy = from_y;
+		int step;
+
+		for (step = 1; step <= slide_steps; step++) {
+			double progress = (double)step / (double)slide_steps;
+			double eased = REffectProgressForCurve((REffectCurve)curve, progress);
+			double target_x = from_x + dx * eased;
+			double target_y = from_y + dy * eased;
+			int ix = (int)(target_x >= 0.0 ? target_x + 0.5 : target_x - 0.5);
+			int iy = (int)(target_y >= 0.0 ? target_y + 0.5 : target_y - 0.5);
+
+			if (ix == last_ix && iy == last_iy)
+				continue;
+
+			for (i = 0; i < n; i++)
+				XMoveWindow(dpy, wins[i], ix + i * ICON_SIZE, iy);
+			XFlush(dpy);
+			if (slide_delay > 0)
+				wusleep(slide_delay * 1000L);
+			else
+				wusleep(1000L);
+
+			if (time(NULL) - time0 > MAX_ANIMATION_TIME)
+				break;
+
+			last_ix = ix;
+			last_iy = iy;
+		}
 	} else {
-		py = dy / slide_slowdown;
-		if (py < slide_steps && py > 0)
-			py = slide_steps;
-		else if (py > -slide_steps && py < 0)
-			py = -slide_steps;
-		px = (is_dy_nul ? 0.0F : py * dx / dy);
-	}
-
-	while (((int)x) != to_x ||
-			 ((int)y) != to_y) {
-		x += px;
-		y += py;
-		if ((px < 0 && (int)x < to_x) || (px > 0 && (int)x > to_x))
-			x = (float)to_x;
-		if ((py < 0 && (int)y < to_y) || (py > 0 && (int)y > to_y))
-			y = (float)to_y;
-
 		if (dx_is_bigger) {
-			px = px * (1.0F - 1 / (float)slide_slowdown);
+			px = dx / slide_slowdown;
 			if (px < slide_steps && px > 0)
 				px = slide_steps;
 			else if (px > -slide_steps && px < 0)
 				px = -slide_steps;
 			py = (is_dx_nul ? 0.0F : px * dy / dx);
 		} else {
-			py = py * (1.0F - 1 / (float)slide_slowdown);
+			py = dy / slide_slowdown;
 			if (py < slide_steps && py > 0)
 				py = slide_steps;
 			else if (py > -slide_steps && py < 0)
@@ -238,17 +247,43 @@ void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int t
 			px = (is_dy_nul ? 0.0F : py * dx / dy);
 		}
 
-		for (i = 0; i < n; i++) {
-			XMoveWindow(dpy, wins[i], (int)x + i * ICON_SIZE, (int)y);
+		while (((int)x) != to_x ||
+				 ((int)y) != to_y) {
+			x += px;
+			y += py;
+			if ((px < 0 && (int)x < to_x) || (px > 0 && (int)x > to_x))
+				x = (float)to_x;
+			if ((py < 0 && (int)y < to_y) || (py > 0 && (int)y > to_y))
+				y = (float)to_y;
+
+			if (dx_is_bigger) {
+				px = px * (1.0F - 1 / (float)slide_slowdown);
+				if (px < slide_steps && px > 0)
+					px = slide_steps;
+				else if (px > -slide_steps && px < 0)
+					px = -slide_steps;
+				py = (is_dx_nul ? 0.0F : px * dy / dx);
+			} else {
+				py = py * (1.0F - 1 / (float)slide_slowdown);
+				if (py < slide_steps && py > 0)
+					py = slide_steps;
+				else if (py > -slide_steps && py < 0)
+					py = -slide_steps;
+				px = (is_dy_nul ? 0.0F : py * dx / dy);
+			}
+
+			for (i = 0; i < n; i++) {
+				XMoveWindow(dpy, wins[i], (int)x + i * ICON_SIZE, (int)y);
+			}
+			XFlush(dpy);
+			if (slide_delay > 0) {
+				wusleep(slide_delay * 1000L);
+			} else {
+				wusleep(1000L);
+			}
+			if (time(NULL) - time0 > MAX_ANIMATION_TIME)
+				break;
 		}
-		XFlush(dpy);
-		if (slide_delay > 0) {
-			wusleep(slide_delay * 1000L);
-		} else {
-			wusleep(1000L);
-		}
-		if (time(NULL) - time0 > MAX_ANIMATION_TIME)
-			break;
 	}
 	for (i = 0; i < n; i++) {
 		XMoveWindow(dpy, wins[i], to_x + i * ICON_SIZE, to_y);
@@ -257,6 +292,12 @@ void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int t
 	XSync(dpy, 0);
 	/* compress expose events */
 	eatExpose();
+}
+
+void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int to_y)
+{
+	slide_windows_with_curve(wins, n, from_x, from_y, to_x, to_y,
+	                         wPreferences.window_movement_effect);
 }
 
 char *ShrinkString(WMFont *font, const char *string, int width)
