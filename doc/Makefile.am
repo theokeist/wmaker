@@ -26,7 +26,7 @@ man_MANS = \
 MOSTLYCLEANFILES = wmaker.1 wmsetbg.1
 
 EXTRA_DIST = wmaker.in wmsetbg.in RUNNING_WMAKER.md GS_DESKTOP_POLISHING.md \
-GLASS_UI_NOTES.md SONOMA_UI_NOTES.md
+GLASS_AND_SONOMA_UI_NOTES.md
 
 
 ################################################################################
