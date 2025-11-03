@@ -103,7 +103,39 @@ codebase.
    values. If GNUstep exposes NSAppearance-like hooks, map the Sonoma defaults to
    those toggles for consistency.
 
-## 7. Implementation order and testing
+## 7. Working with external compositors
+
+Window Maker will continue to rely on a separate compositor (for example
+`picom`) to blend translucent pixels onto the framebuffer, but wrlib and WINGs
+have to adapt so their drawables look correct once that compositor is present.
+
+1. **Prefer ARGB visuals when available** – extend the existing visual selection
+   in `wrlib/context.c` so it can request a 32-bit, alpha-capable visual from the
+   X server whenever the Composite extension is active. Fall back to the current
+   TrueColor path if the visual cannot be allocated to keep classic setups
+   functional.
+2. **Expose premultiplied surfaces** – teach the new material helpers in
+   `wrlib/effects.c` to return `RImage` buffers flagged as premultiplied so their
+   alpha channels survive the compositor blend without fringing. Add convenience
+   wrappers that upload those buffers to XRender pictures for rapid reuse across
+   menus, panels, and window frames.
+3. **Upgrade WINGs windows** – update widget creation paths (`wmenu.c`,
+   `wpanel.c`, `wview.c`) to detect when the alpha visual is active and create
+   their backing windows with `CWColormap | CWBorderPixel | CWBackPixel` plus the
+   new visual. Store an off-screen pixmap per widget so repaints can happen in
+   ARGB space before being copied into the window.
+4. **Blend-friendly painting** – replace opaque `XFillRectangle` calls with
+   wrlib blits that honor premultiplied alpha. For example, draw rounded masks
+   into an ARGB pixmap and composite gradients or highlights on top before
+   presenting the final surface to the compositor. Because the compositor handles
+   the final blend, these buffers can include translucent corners, glass
+   highlights, and drop shadows without manual shape updates.
+5. **Graceful degradation** – add runtime checks so if no compositor is present,
+   WINGs falls back to the classic opaque theme path. That way the new rendering
+   ergonomics improve visuals when the compositor runs but never regress systems
+   that prefer the traditional, non-translucent look.
+
+## 8. Implementation order and testing
 
 1. Land the wrlib material and shadow APIs with unit tests that cover caching and
    performance safeguards.
