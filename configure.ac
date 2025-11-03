@@ -100,6 +100,30 @@ AC_PROG_LN_S
 LT_INIT
 
 
+dnl Embed runtime search paths so installations under /usr/local/lib work out
+dnl of the box unless the user explicitly opts out.
+AC_ARG_ENABLE([runpath],
+    [AS_HELP_STRING([--disable-runpath],
+        [do not embed runtime library search paths in executables])],
+    [want_runpath=$enableval],
+    [want_runpath=yes])
+
+AS_IF([test "x$want_runpath" = "xyes"],
+    [save_prefix=$prefix
+     save_exec_prefix=$exec_prefix
+     AS_IF([test "x$prefix" = "xNONE"], [prefix=$ac_default_prefix])
+     AS_IF([test "x$exec_prefix" = "xNONE"], [exec_prefix=$prefix])
+     eval expanded_libdir="$libdir"
+     prefix=$save_prefix
+     exec_prefix=$save_exec_prefix
+     AS_CASE([$expanded_libdir],
+        [/lib*|/usr/lib*], [WMAKER_RUNPATH_FLAGS=''],
+        [*], [WMAKER_RUNPATH_FLAGS="-Wl,-rpath,$expanded_libdir"])
+    ],
+    [WMAKER_RUNPATH_FLAGS=''])
+AC_SUBST([WMAKER_RUNPATH_FLAGS])
+
+
 dnl Debugging Options
 dnl =================
 m4_divert_push([INIT_PREPARE])dnl

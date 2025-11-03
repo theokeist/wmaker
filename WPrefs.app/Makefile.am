@@ -6,6 +6,8 @@ wpexecbindir = @wprefs_bindir@
 
 wpexecbin_PROGRAMS = WPrefs
 
+AM_LDFLAGS = $(WMAKER_RUNPATH_FLAGS)
+
 wpdatadir = @wprefs_datadir@
 
 wpdata_DATA = WPrefs.tiff WPrefs.xpm

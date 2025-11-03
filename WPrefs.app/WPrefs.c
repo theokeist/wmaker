@@ -208,11 +208,11 @@ static void createMainWindow(WMScreen * scr)
 	char buffer[128];
 
 	WPrefs.win = WMCreateWindow(scr, "wprefs");
-	WMResizeWidget(WPrefs.win, 520, 390);
+	WMResizeWidget(WPrefs.win, 520, 420);
 	WMSetWindowTitle(WPrefs.win, _("Window Maker Preferences"));
 	WMSetWindowCloseAction(WPrefs.win, quit, NULL);
-	WMSetWindowMaxSize(WPrefs.win, 520, 390);
-	WMSetWindowMinSize(WPrefs.win, 520, 390);
+	WMSetWindowMaxSize(WPrefs.win, 520, 420);
+	WMSetWindowMinSize(WPrefs.win, 520, 420);
 	WMSetWindowMiniwindowTitle(WPrefs.win, _("Preferences"));
 
 	WPrefs.scrollV = WMCreateScrollView(WPrefs.win);
@@ -231,31 +231,31 @@ static void createMainWindow(WMScreen * scr)
 
 	WPrefs.undosBtn = WMCreateCommandButton(WPrefs.win);
 	WMResizeWidget(WPrefs.undosBtn, 90, 28);
-	WMMoveWidget(WPrefs.undosBtn, 135, 350);
+	WMMoveWidget(WPrefs.undosBtn, 135, 380);
 	WMSetButtonText(WPrefs.undosBtn, _("Revert Page"));
 	WMSetButtonAction(WPrefs.undosBtn, undo, NULL);
 
 	WPrefs.undoBtn = WMCreateCommandButton(WPrefs.win);
 	WMResizeWidget(WPrefs.undoBtn, 90, 28);
-	WMMoveWidget(WPrefs.undoBtn, 235, 350);
+	WMMoveWidget(WPrefs.undoBtn, 235, 380);
 	WMSetButtonText(WPrefs.undoBtn, _("Revert All"));
 	WMSetButtonAction(WPrefs.undoBtn, undoAll, NULL);
 
 	WPrefs.saveBtn = WMCreateCommandButton(WPrefs.win);
 	WMResizeWidget(WPrefs.saveBtn, 80, 28);
-	WMMoveWidget(WPrefs.saveBtn, 335, 350);
+	WMMoveWidget(WPrefs.saveBtn, 335, 380);
 	WMSetButtonText(WPrefs.saveBtn, _("Save"));
 	WMSetButtonAction(WPrefs.saveBtn, save, NULL);
 
 	WPrefs.closeBtn = WMCreateCommandButton(WPrefs.win);
 	WMResizeWidget(WPrefs.closeBtn, 80, 28);
-	WMMoveWidget(WPrefs.closeBtn, 425, 350);
+	WMMoveWidget(WPrefs.closeBtn, 425, 380);
 	WMSetButtonText(WPrefs.closeBtn, _("Close"));
 	WMSetButtonAction(WPrefs.closeBtn, quit, NULL);
 
 	WPrefs.balloonBtn = WMCreateSwitchButton(WPrefs.win);
 	WMResizeWidget(WPrefs.balloonBtn, 200, 28);
-	WMMoveWidget(WPrefs.balloonBtn, 15, 350);
+	WMMoveWidget(WPrefs.balloonBtn, 15, 380);
 	WMSetButtonText(WPrefs.balloonBtn, _("Balloon Help"));
 	WMSetButtonAction(WPrefs.balloonBtn, toggleBalloons, NULL);
 	{
