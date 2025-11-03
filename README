@@ -67,7 +67,11 @@ Documentation
 Read before asking.
 
 * README files all over the source tree have info related to the stuff
-in the directories.
+  in the directories.
+
+* doc/RUNNING_WMAKER.md explains how to wire Window Maker into
+  `startx`, display managers, or existing X11 sessions once the binary
+  is installed.
 
 * INSTALL has installation instructions and some troubleshooting tips.
 You're meant to read it if you are compiling the sources.
