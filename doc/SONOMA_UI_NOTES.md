@@ -153,3 +153,42 @@ Following this blueprint keeps the Sonoma aesthetic grounded in reusable
 infrastructure: wrlib supplies vibrant materials, WINGs presents them through
 widgets, the core window manager animates them, and WPrefs lets users fine-tune
 the experience.
+
+## 9. Native WINGs touchpoints and blast radius
+
+Modernizing Window Maker while keeping the WINGs toolkit as the “native” UI
+means coordinating a defined set of subsystems so translucency, motion, and
+Sonoma-style polish never regress classic behavior:
+
+1. **Raster backbone (wrlib)** – material generation, shadow kernels, and
+   premultiplied ARGB export live here. Every widget or window that needs glass
+   effects depends on these helpers, so the work touches `effects.c`,
+   `scale.c`, and the visual-selection routines in `context.c`.
+2. **Toolkit surfaces (WINGs)** – menus, panels, views, buttons, scroll views,
+   and text fields all draw through WINGs painters. Updating them means
+   modifying `wmenu.c`, `wpanel.c`, `wview.c`, `wbutton.c`, `wscrollview.c`, and
+   related defaults tables so they consume the new raster APIs while retaining
+   opaque fallbacks.
+3. **Core manager chrome** – frame windows, menus, docks, and appicons are
+   orchestrated by `framewin.c`, `menu.c`, `dock.c`, and `icon.c`. Each module
+   must request materials from wrlib, apply easing curves during motion, and
+   observe new defaults without disrupting long-standing configuration keys.
+4. **Configuration plumbing** – defaults readers/writers (`defaults.c`,
+   `wdefaults.c`) and schema headers (`WindowMaker.h`) carry the Sonoma tuning
+   knobs. Compatibility shims ensure existing preference files still parse even
+   if they predate the new keys.
+5. **Preferences UI (WPrefs.app)** – panels backed by `Icons.c`,
+   `Configurations.c`, and `WindowHandling.c` expose the options to users. They
+   need live previews that honor the compositor-aware rendering paths while
+   remaining usable on systems without compositing.
+6. **Dockapps and GNUstep clients** – helper libraries (`wmlib`, GNUstep
+   theming bridges) read the same defaults so third-party utilities pick up the
+   aesthetic automatically. Documentation updates explain how to opt in without
+   rewriting legacy apps.
+
+Keeping the modernization confined to these six areas lets the codebase grow
+“glass” capabilities without breaking classic setups: each layer offers explicit
+fallbacks, retains binary compatibility, and coordinates through defaults rather
+than hard-coded assumptions. When evaluated together they form the minimum touch
+surface necessary for WINGs to remain the native UI while embracing contemporary
+visual ergonomics.
