@@ -636,6 +636,8 @@ static void createPanel(Panel * p)
 	panel->moveEffectP = WMCreatePopUpButton(panel->effectsF);
 	WMResizeWidget(panel->moveEffectP, 180, 20);
 	WMMoveWidget(panel->moveEffectP, 160, 20);
+	WMSetBalloonTextForView(_("Applies when windows settle after non-opaque drags or grouped moves."),
+				WMWidgetView(panel->moveEffectP));
 
 	panel->launchEffectL = WMCreateLabel(panel->effectsF);
 	WMResizeWidget(panel->launchEffectL, 150, 20);
