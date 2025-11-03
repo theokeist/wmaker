@@ -71,6 +71,7 @@ typedef struct _Panel {
 	WMPopUpButton *launchEffectP;
 	WMLabel *moveEffectL;
 	WMLabel *launchEffectL;
+	WMButton *showContentB;
 } _Panel;
 
 #define ICON_FILE "whandling"
@@ -285,9 +286,12 @@ static void showData(_Panel * panel)
         WMSetPopUpButtonSelectedItem(panel->moveEffectP,
                                      clamp_transition_effect_index(getTransitionEffect(str)));
 
-        str = GetStringForKey("LaunchEffect");
-        WMSetPopUpButtonSelectedItem(panel->launchEffectP,
-                                     clamp_transition_effect_index(getTransitionEffect(str)));
+	str = GetStringForKey("LaunchEffect");
+	WMSetPopUpButtonSelectedItem(panel->launchEffectP,
+     clamp_transition_effect_index(getTransitionEffect(str)));
+
+	WMSetButtonSelected(panel->showContentB,
+		GetBoolForKey("ShowWindowContentsDuringAnimations"));
 
 	if (GetBoolForKey("Attraction"))
 		WMPerformButtonClick(panel->resrB);
@@ -318,14 +322,17 @@ static void storeData(_Panel * panel)
 	WMReleasePropList(y);
 	SetObjectForKey(arr, "WindowPlaceOrigin");
 
-        {
-                int move_index = clamp_transition_effect_index(WMGetPopUpButtonSelectedItem(panel->moveEffectP));
-                int launch_index = clamp_transition_effect_index(WMGetPopUpButtonSelectedItem(panel->launchEffectP));
+	{
+		int move_index = clamp_transition_effect_index(WMGetPopUpButtonSelectedItem(panel->moveEffectP));
+		int launch_index = clamp_transition_effect_index(WMGetPopUpButtonSelectedItem(panel->launchEffectP));
 
-                SetStringForKey(transition_effects[move_index].db_value, "WindowMovementEffect");
+		SetStringForKey(transition_effects[move_index].db_value, "WindowMovementEffect");
 
-                SetStringForKey(transition_effects[launch_index].db_value, "LaunchEffect");
-        }
+		SetStringForKey(transition_effects[launch_index].db_value, "LaunchEffect");
+	}
+
+	SetBoolForKey(WMGetButtonSelected(panel->showContentB),
+		"ShowWindowContentsDuringAnimations");
 
 	SetIntegerForKey(WMGetSliderValue(panel->resS), "EdgeResistance");
 
@@ -635,7 +642,7 @@ static void createPanel(Panel * p)
 
     /**************** Transition Effects ****************/
 	panel->effectsF = WMCreateFrame(panel->box);
-	WMResizeWidget(panel->effectsF, 357, 86);
+	WMResizeWidget(panel->effectsF, 357, 112);
 	WMMoveWidget(panel->effectsF, 8, 228);
 	WMSetFrameTitle(panel->effectsF, _("Window animations"));
 	WMSetBalloonTextForView(_("Choose easing curves for moves and application launches."),
@@ -661,6 +668,15 @@ static void createPanel(Panel * p)
 	WMResizeWidget(panel->launchEffectP, 180, 20);
 	WMMoveWidget(panel->launchEffectP, 160, 46);
 
+	panel->showContentB = WMCreateSwitchButton(panel->effectsF);
+	WMResizeWidget(panel->showContentB, 330, 23);
+	WMMoveWidget(panel->showContentB, 12, 72);
+	WMSetButtonText(panel->showContentB,
+	_("Show window contents during animations"));
+	WMSetBalloonTextForView(_("Capture the window contents before minimizing and play them\n"
+	"during minimize/maximize animations."),
+	WMWidgetView(panel->showContentB));
+
         for (i = 0; i < wlengthof(transition_effects); i++)
                 WMAddPopUpButtonItem(panel->moveEffectP, _(transition_effects[i].label));
         for (i = 0; i < wlengthof(transition_effects); i++)
@@ -669,9 +685,10 @@ static void createPanel(Panel * p)
         WMSetPopUpButtonSelectedItem(panel->moveEffectP, 0);
         WMSetPopUpButtonSelectedItem(panel->launchEffectP, 0);
 
-        /* The pop-up buttons are plain children (not boxes), so map them explicitly */
-        WMMapWidget(panel->moveEffectP);
-        WMMapWidget(panel->launchEffectP);
+	/* The pop-up buttons are plain children (not boxes), so map them explicitly */
+	WMMapWidget(panel->moveEffectP);
+	WMMapWidget(panel->launchEffectP);
+	WMMapWidget(panel->showContentB);
 
         WMMapSubwidgets(panel->effectsF);
 

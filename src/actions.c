@@ -1065,6 +1065,104 @@ void wUnfullscreenWindow(WWindow *wwin)
 }
 
 #ifdef USE_ANIMATIONS
+static Bool animateResizeWithContents(WWindow *wwin, RImage *snapshot,
+				       int x, int y, int w, int h,
+				       int fx, int fy, int fw, int fh)
+{
+	int style = wPreferences.iconification_style;
+	WScreen *scr = wwin->screen_ptr;
+	Display *display = dpy;
+	XSetWindowAttributes attr;
+	Window overlay;
+	GC gc;
+	Bool success = True;
+	int steps;
+
+	if (!snapshot)
+		return False;
+
+	if (style == WIS_RANDOM || style != WIS_ZOOM)
+		return False;
+
+	steps = MINIATURIZE_ANIMATION_STEPS_Z;
+	if (steps <= 0)
+		return False;
+
+	if (w <= 0)
+		w = 1;
+	if (h <= 0)
+		h = 1;
+	if (fw <= 0)
+		fw = 1;
+	if (fh <= 0)
+		fh = 1;
+
+	attr.override_redirect = True;
+	attr.save_under = True;
+	overlay = XCreateWindow(display, scr->root_win, x, y, w, h, 0,
+				 CopyFromParent, InputOutput, CopyFromParent,
+				 CWOverrideRedirect | CWSaveUnder, &attr);
+	if (!overlay)
+		return False;
+
+	gc = XCreateGC(display, overlay, 0, NULL);
+	if (!gc) {
+		XDestroyWindow(display, overlay);
+		return False;
+	}
+
+	XMapRaised(display, overlay);
+	XGrabServer(display);
+
+	for (int step = 0; step <= steps; step++) {
+		double t = (double)step / (double)steps;
+		int cur_w = w + (int)((fw - w) * t + 0.5);
+		int cur_h = h + (int)((fh - h) * t + 0.5);
+		int cur_x = x + (int)((fx - x) * t + 0.5);
+		int cur_y = y + (int)((fy - y) * t + 0.5);
+		RImage *scaled;
+		Pixmap pix;
+
+		if (cur_w <= 0)
+			cur_w = 1;
+		if (cur_h <= 0)
+			cur_h = 1;
+
+		if (snapshot->width == (unsigned)cur_w && snapshot->height == (unsigned)cur_h)
+			scaled = RRetainImage(snapshot);
+		else
+			scaled = RScaleImage(snapshot, cur_w, cur_h);
+		if (!scaled) {
+			success = False;
+			break;
+		}
+
+		if (!RConvertImage(scr->rcontext, scaled, &pix)) {
+			RReleaseImage(scaled);
+			success = False;
+			break;
+		}
+
+		XResizeWindow(display, overlay, cur_w, cur_h);
+		XMoveWindow(display, overlay, cur_x, cur_y);
+		XCopyArea(display, pix, overlay, gc, 0, 0, cur_w, cur_h, 0, 0);
+		XFlush(display);
+		if (MINIATURIZE_ANIMATION_DELAY_Z > 0)
+			wusleep(MINIATURIZE_ANIMATION_DELAY_Z);
+
+		XFreePixmap(display, pix);
+		RReleaseImage(scaled);
+	}
+
+	XUngrabServer(display);
+	XUnmapWindow(display, overlay);
+	XDestroyWindow(display, overlay);
+	XFreeGC(display, gc);
+	XFlush(display);
+
+	return success;
+}
+
 static void animateResizeFlip(WScreen *scr, int x, int y, int w, int h, int fx, int fy, int fw, int fh, int steps)
 {
 #define FRAMES (MINIATURIZE_ANIMATION_FRAMES_F)
@@ -1395,6 +1493,9 @@ void wIconifyWindow(WWindow *wwin)
 {
 	XWindowAttributes attribs;
 	int present;
+#ifdef USE_ANIMATIONS
+	RImage *content_snapshot = NULL;
+#endif
 
 	if (!XGetWindowAttributes(dpy, wwin->client_win, &attribs))
 		return; /* the window doesn't exist anymore */
@@ -1410,6 +1511,18 @@ void wIconifyWindow(WWindow *wwin)
 	}
 
 	present = wwin->frame->workspace == wwin->screen_ptr->current_workspace;
+#ifdef USE_ANIMATIONS
+	if (present && wPreferences.show_window_contents_in_animations &&
+	    !wPreferences.no_animations) {
+		content_snapshot = RCreateImageFromDrawable(wwin->screen_ptr->rcontext,
+					       wwin->frame->core->window, None);
+		if (content_snapshot) {
+			if (wwin->animation_snapshot)
+				RReleaseImage(wwin->animation_snapshot);
+			wwin->animation_snapshot = RRetainImage(content_snapshot);
+		}
+	}
+#endif
 
 	/* if the window is in another workspace, simplify process */
 	if (present) {
@@ -1493,12 +1606,29 @@ void wIconifyWindow(WWindow *wwin)
 
 		flushExpose();
 #ifdef USE_ANIMATIONS
-		if (getAnimationGeometry(wwin, &ix, &iy, &iw, &ih))
-			animateResize(wwin->screen_ptr, wwin->frame_x, wwin->frame_y,
-				      wwin->frame->core->width, wwin->frame->core->height, ix, iy, iw, ih);
+		if (getAnimationGeometry(wwin, &ix, &iy, &iw, &ih)) {
+			Bool used_contents = False;
+
+			if (content_snapshot && wPreferences.show_window_contents_in_animations)
+				used_contents = animateResizeWithContents(wwin, content_snapshot,
+								 wwin->frame_x, wwin->frame_y,
+								 wwin->frame->core->width,
+								 wwin->frame->core->height,
+								 ix, iy, iw, ih);
+
+			if (!used_contents)
+				animateResize(wwin->screen_ptr, wwin->frame_x, wwin->frame_y,
+					      wwin->frame->core->width, wwin->frame->core->height, ix, iy, iw, ih);
+		}
 #endif
 	}
 
+#ifdef USE_ANIMATIONS
+	if (content_snapshot) {
+		RReleaseImage(content_snapshot);
+		content_snapshot = NULL;
+	}
+#endif
 	wwin->flags.skip_next_animation = 0;
 
 	if (!wPreferences.disable_miniwindows && !wwin->flags.net_handle_icon) {
@@ -1612,10 +1742,24 @@ void wDeiconifyWindow(WWindow *wwin)
 	if (!netwm_hidden) {
 #ifdef USE_ANIMATIONS
 		int ix, iy, iw, ih;
-		if (getAnimationGeometry(wwin, &ix, &iy, &iw, &ih))
-			animateResize(wwin->screen_ptr, ix, iy, iw, ih,
-				      wwin->frame_x, wwin->frame_y,
-				      wwin->frame->core->width, wwin->frame->core->height);
+		if (getAnimationGeometry(wwin, &ix, &iy, &iw, &ih)) {
+			Bool used_contents = False;
+
+			if (wPreferences.show_window_contents_in_animations && wwin->animation_snapshot)
+				used_contents = animateResizeWithContents(wwin, wwin->animation_snapshot,
+								 ix, iy, iw, ih,
+								 wwin->frame_x, wwin->frame_y,
+								 wwin->frame->core->width, wwin->frame->core->height);
+
+			if (!used_contents)
+				animateResize(wwin->screen_ptr, ix, iy, iw, ih,
+					      wwin->frame_x, wwin->frame_y,
+					      wwin->frame->core->width, wwin->frame->core->height);
+		}
+		if (wwin->animation_snapshot) {
+			RReleaseImage(wwin->animation_snapshot);
+			wwin->animation_snapshot = NULL;
+		}
 #endif
 		wwin->flags.skip_next_animation = 0;
 		XGrabServer(dpy);

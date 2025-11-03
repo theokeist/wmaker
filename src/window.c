@@ -161,6 +161,7 @@ WWindow *wWindowCreate(void)
 
 	wwin = wmalloc(sizeof(WWindow));
 	wretain(wwin);
+	wwin->animation_snapshot = NULL;
 
 	wwin->client_descriptor.handle_mousedown = frameMouseDown;
 	wwin->client_descriptor.parent = wwin;
@@ -234,6 +235,8 @@ void wWindowDestroy(WWindow *wwin)
 	}
 	if (wwin->net_icon_image)
 		RReleaseImage(wwin->net_icon_image);
+	if (wwin->animation_snapshot)
+		RReleaseImage(wwin->animation_snapshot);
 
 	wrelease(wwin);
 }

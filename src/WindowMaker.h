@@ -447,6 +447,7 @@ extern struct WPreferences {
         /* transition curves */
         signed char window_movement_effect;
         signed char launch_effect;
+        char show_window_contents_in_animations;
 
         /* shading animation */
         signed char shade_speed;

@@ -432,6 +432,8 @@ WDefaultEntry optionList[] = {
 	    &wPreferences.window_movement_effect, getEnum, NULL, NULL, NULL},
 	{"LaunchEffect", "Classic", seTransitionEffects,
 	    &wPreferences.launch_effect, getEnum, NULL, NULL, NULL},
+	{"ShowWindowContentsDuringAnimations", "NO", NULL,
+	    &wPreferences.show_window_contents_in_animations, getBool, NULL, NULL, NULL},
 	{"ShadeSpeed", "fast", seSpeeds,
 	    &wPreferences.shade_speed, getEnum, NULL, NULL, NULL},
 	{"BounceAppIconsWhenUrgent", "YES", NULL,
