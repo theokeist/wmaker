@@ -648,12 +648,16 @@ static void createPanel(Panel * p)
 	WMResizeWidget(panel->launchEffectP, 180, 20);
 	WMMoveWidget(panel->launchEffectP, 160, 46);
 
-	for (i = 0; i < wlengthof(transition_effects); i++)
-		WMAddPopUpButtonItem(panel->moveEffectP, _(transition_effects[i].label));
-	for (i = 0; i < wlengthof(transition_effects); i++)
-		WMAddPopUpButtonItem(panel->launchEffectP, _(transition_effects[i].label));
+        for (i = 0; i < wlengthof(transition_effects); i++)
+                WMAddPopUpButtonItem(panel->moveEffectP, _(transition_effects[i].label));
+        for (i = 0; i < wlengthof(transition_effects); i++)
+                WMAddPopUpButtonItem(panel->launchEffectP, _(transition_effects[i].label));
 
-	WMMapSubwidgets(panel->effectsF);
+        /* The pop-up buttons are plain children (not boxes), so map them explicitly */
+        WMMapWidget(panel->moveEffectP);
+        WMMapWidget(panel->launchEffectP);
+
+        WMMapSubwidgets(panel->effectsF);
 
 	WMRealizeWidget(panel->box);
 	WMMapSubwidgets(panel->box);
