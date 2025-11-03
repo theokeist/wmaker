@@ -72,6 +72,9 @@ Read before asking.
 * doc/RUNNING_WMAKER.md explains how to wire Window Maker into
   `startx`, display managers, or existing X11 sessions once the binary
   is installed.
+* doc/BUILDING_ON_DEBIAN_UBUNTU.md walks through installing the build
+  dependencies and compiling Window Maker on Debian 12/13 and Ubuntu
+  25.10 systems.
 * doc/GLASS_AND_SONOMA_UI_NOTES.md combines the glass UI roadmap
   with the Sonoma modernization blueprint, detailing wrlib materials,
   WINGs hooks, and Window Maker touchpoints for rounded, translucent
