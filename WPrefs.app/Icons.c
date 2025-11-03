@@ -368,7 +368,7 @@ static void createPanel(Panel * p)
         panel->size.valueL = WMCreateLabel(panel->size.frame);
         WMResizeWidget(panel->size.valueL, 40, 15);
         WMMoveWidget(panel->size.valueL, 120, 23);
-        WMSetLabelAlignment(panel->size.valueL, WALeft);
+        WMSetLabelTextAlignment(panel->size.valueL, WALeft);
 
         WMMapSubwidgets(panel->size.frame);
 
