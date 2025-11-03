@@ -110,13 +110,21 @@ static const struct {
 };
 
 static const struct {
-	const char *db_value;
-	const char *label;
+        const char *db_value;
+        const char *label;
 } transition_effects[] = {
-	{ "Classic", N_("Classic (legacy acceleration)") },
-	{ "Smooth",  N_("Smooth ease-in/out") },
-	{ "Gentle",  N_("Gentle smoothstep") }
+        { "Classic", N_("Classic (legacy acceleration)") },
+        { "Smooth",  N_("Smooth ease-in/out") },
+        { "Gentle",  N_("Gentle smoothstep") }
 };
+
+static inline int clamp_transition_effect_index(int index)
+{
+        if (index < 0 || index >= (int)wlengthof(transition_effects))
+                return 0;
+
+        return index;
+}
 
 static void sliderCallback(WMWidget * w, void *data)
 {
@@ -274,10 +282,12 @@ static void showData(_Panel * panel)
 	WMSetButtonSelected(panel->mdockB, GetBoolForKey("NoWindowOverDock"));
 
 	str = GetStringForKey("WindowMovementEffect");
-	WMSetPopUpButtonSelectedItem(panel->moveEffectP, getTransitionEffect(str));
+        WMSetPopUpButtonSelectedItem(panel->moveEffectP,
+                                     clamp_transition_effect_index(getTransitionEffect(str)));
 
-	str = GetStringForKey("LaunchEffect");
-	WMSetPopUpButtonSelectedItem(panel->launchEffectP, getTransitionEffect(str));
+        str = GetStringForKey("LaunchEffect");
+        WMSetPopUpButtonSelectedItem(panel->launchEffectP,
+                                     clamp_transition_effect_index(getTransitionEffect(str)));
 
 	if (GetBoolForKey("Attraction"))
 		WMPerformButtonClick(panel->resrB);
@@ -308,11 +318,14 @@ static void storeData(_Panel * panel)
 	WMReleasePropList(y);
 	SetObjectForKey(arr, "WindowPlaceOrigin");
 
-	SetStringForKey(transition_effects[WMGetPopUpButtonSelectedItem(panel->moveEffectP)].db_value,
-			"WindowMovementEffect");
+        {
+                int move_index = clamp_transition_effect_index(WMGetPopUpButtonSelectedItem(panel->moveEffectP));
+                int launch_index = clamp_transition_effect_index(WMGetPopUpButtonSelectedItem(panel->launchEffectP));
 
-	SetStringForKey(transition_effects[WMGetPopUpButtonSelectedItem(panel->launchEffectP)].db_value,
-			"LaunchEffect");
+                SetStringForKey(transition_effects[move_index].db_value, "WindowMovementEffect");
+
+                SetStringForKey(transition_effects[launch_index].db_value, "LaunchEffect");
+        }
 
 	SetIntegerForKey(WMGetSliderValue(panel->resS), "EdgeResistance");
 
@@ -652,6 +665,9 @@ static void createPanel(Panel * p)
                 WMAddPopUpButtonItem(panel->moveEffectP, _(transition_effects[i].label));
         for (i = 0; i < wlengthof(transition_effects); i++)
                 WMAddPopUpButtonItem(panel->launchEffectP, _(transition_effects[i].label));
+
+        WMSetPopUpButtonSelectedItem(panel->moveEffectP, 0);
+        WMSetPopUpButtonSelectedItem(panel->launchEffectP, 0);
 
         /* The pop-up buttons are plain children (not boxes), so map them explicitly */
         WMMapWidget(panel->moveEffectP);
