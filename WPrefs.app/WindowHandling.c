@@ -713,7 +713,10 @@ static void createPanel(Panel * p)
         WMMapSubwidgets(panel->effectsF);
 
         WMRealizeWidget(panel->box);
+        WMRealizeWidget(panel->contentB);
         WMMapWidget(panel->scrollV);
+        /* Explicitly map the scroll view's content so the controls become visible. */
+        WMMapWidget(panel->contentB);
         WMMapSubwidgets(panel->box);
         WMMapSubwidgets(panel->contentB);
 
