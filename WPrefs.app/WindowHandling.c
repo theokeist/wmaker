@@ -32,7 +32,10 @@ typedef struct _Panel {
 
 	WMWidget *parent;
 
-	WMFrame *placF;
+        WMScrollView *scrollV;
+        WMBox *contentB;
+
+        WMFrame *placF;
 	WMPopUpButton *placP;
 	WMLabel *porigL;
 	WMLabel *porigvL;
@@ -357,17 +360,31 @@ static void createPanel(Panel * p)
 	WMBox *hbox;
 	int i;
 
-	panel->box = WMCreateBox(panel->parent);
-	WMSetViewExpandsToParent(WMWidgetView(panel->box), 2, 2, 2, 2);
-	WMSetBoxHorizontal(panel->box, False);
-	WMSetBoxBorderWidth(panel->box, 8);
+        panel->box = WMCreateBox(panel->parent);
+        WMSetViewExpandsToParent(WMWidgetView(panel->box), 2, 2, 2, 2);
+        WMSetBoxHorizontal(panel->box, False);
+        WMSetBoxBorderWidth(panel->box, 0);
 
-	hbox = WMCreateBox(panel->box);
+        panel->scrollV = WMCreateScrollView(panel->box);
+        WMResizeWidget(panel->scrollV, FRAME_WIDTH - 16, FRAME_HEIGHT - 16);
+        WMMoveWidget(panel->scrollV, 8, 8);
+        WMSetScrollViewRelief(panel->scrollV, WRSunken);
+        WMSetScrollViewHasVerticalScroller(panel->scrollV, True);
+        WMSetScrollViewHasHorizontalScroller(panel->scrollV, False);
+
+        panel->contentB = WMCreateBox(panel->box);
+        WMSetBoxHorizontal(panel->contentB, False);
+        WMSetBoxBorderWidth(panel->contentB, 8);
+        WMResizeWidget(panel->contentB, FRAME_WIDTH - 32, FRAME_HEIGHT + 40);
+
+        WMSetScrollViewContentView(panel->scrollV, WMWidgetView(panel->contentB));
+
+        hbox = WMCreateBox(panel->contentB);
 	WMSetBoxHorizontal(hbox, True);
-	WMAddBoxSubview(panel->box, WMWidgetView(hbox), False, True, 110, 0, 10);
+        WMAddBoxSubview(panel->contentB, WMWidgetView(hbox), False, True, 110, 0, 10);
 
     /************** Window Placement ***************/
-	panel->placF = WMCreateFrame(panel->box);
+        panel->placF = WMCreateFrame(panel->contentB);
 	WMResizeWidget(panel->placF, 222, 163);
 	WMMoveWidget(panel->placF, 8, 6);
 	WMSetFrameTitle(panel->placF, _("Window Placement"));
@@ -462,7 +479,7 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->placF);
 
     /************** Opaque Move, Resize ***************/
-	panel->opaqF = WMCreateFrame(panel->box);
+        panel->opaqF = WMCreateFrame(panel->contentB);
 	WMResizeWidget(panel->opaqF, 140, 118);
 	WMMoveWidget(panel->opaqF, 372, 103);
 
@@ -544,7 +561,7 @@ static void createPanel(Panel * p)
 
 
     /**************** Account for Icon/Dock ***************/
-	panel->maxiF = WMCreateFrame(panel->box);
+        panel->maxiF = WMCreateFrame(panel->contentB);
 	WMResizeWidget(panel->maxiF, 140, 92);
 	WMMoveWidget(panel->maxiF, 372, 6);
 	WMSetFrameTitle(panel->maxiF, _("When maximizing..."));
@@ -567,7 +584,7 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->maxiF);
 
     /**************** Resize with Mod+Wheel ***************/
-	panel->resizeF = WMCreateFrame(panel->box);
+        panel->resizeF = WMCreateFrame(panel->contentB);
 	WMResizeWidget(panel->resizeF, 127, 66);
 	WMMoveWidget(panel->resizeF, 238, 103);
 	WMSetFrameTitle(panel->resizeF, _("Mod+Wheel"));
@@ -591,7 +608,7 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->resizeF);
 
     /**************** Edge Resistance  ****************/
-	panel->resF = WMCreateFrame(panel->box);
+        panel->resF = WMCreateFrame(panel->contentB);
 	WMResizeWidget(panel->resF, 127, 92);
 	WMMoveWidget(panel->resF, 238, 6);
 	WMSetFrameTitle(panel->resF, _("Edge Resistance"));
@@ -626,7 +643,7 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->resF);
 
     /**************** Dragging a Maximized Window ****************/
-	panel->dragmaxF = WMCreateFrame(panel->box);
+        panel->dragmaxF = WMCreateFrame(panel->contentB);
 	WMResizeWidget(panel->dragmaxF, 357, 49);
 	WMMoveWidget(panel->dragmaxF, 8, 172);
 	WMSetFrameTitle(panel->dragmaxF, _("Dragging a maximized window..."));
@@ -641,7 +658,7 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->dragmaxF);
 
     /**************** Transition Effects ****************/
-	panel->effectsF = WMCreateFrame(panel->box);
+        panel->effectsF = WMCreateFrame(panel->contentB);
 	WMResizeWidget(panel->effectsF, 357, 112);
 	WMMoveWidget(panel->effectsF, 8, 228);
 	WMSetFrameTitle(panel->effectsF, _("Window animations"));
@@ -692,8 +709,10 @@ static void createPanel(Panel * p)
 
         WMMapSubwidgets(panel->effectsF);
 
-	WMRealizeWidget(panel->box);
-	WMMapSubwidgets(panel->box);
+        WMRealizeWidget(panel->box);
+        WMMapWidget(panel->scrollV);
+        WMMapSubwidgets(panel->box);
+        WMMapSubwidgets(panel->contentB);
 
 	/* show the config data */
 	showData(panel);
