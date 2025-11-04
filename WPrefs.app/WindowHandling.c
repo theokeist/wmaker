@@ -90,6 +90,9 @@ typedef struct _Panel {
 #define PLACEMENT_WINDOW_PIXMAP "smallwindow"
 
 #define THUMB_SIZE	16
+#define EFFECTS_FRAME_Y 228
+#define EFFECTS_FRAME_HEIGHT 138
+#define WINDOW_HANDLING_CONTENT_HEIGHT (EFFECTS_FRAME_Y + EFFECTS_FRAME_HEIGHT + 16)
 
 static const struct {
 	const char *db_value;
@@ -375,7 +378,7 @@ static void createPanel(Panel * p)
         panel->contentB = WMCreateBox(panel->box);
         WMSetBoxHorizontal(panel->contentB, False);
         WMSetBoxBorderWidth(panel->contentB, 8);
-        WMResizeWidget(panel->contentB, FRAME_WIDTH - 32, FRAME_HEIGHT + 40);
+        WMResizeWidget(panel->contentB, FRAME_WIDTH - 32, WINDOW_HANDLING_CONTENT_HEIGHT);
 
         WMSetScrollViewContentView(panel->scrollV, WMWidgetView(panel->contentB));
 
@@ -659,8 +662,8 @@ static void createPanel(Panel * p)
 
     /**************** Transition Effects ****************/
         panel->effectsF = WMCreateFrame(panel->contentB);
-	WMResizeWidget(panel->effectsF, 357, 112);
-	WMMoveWidget(panel->effectsF, 8, 228);
+	WMResizeWidget(panel->effectsF, 357, EFFECTS_FRAME_HEIGHT);
+	WMMoveWidget(panel->effectsF, 8, EFFECTS_FRAME_Y);
 	WMSetFrameTitle(panel->effectsF, _("Window animations"));
 	WMSetBalloonTextForView(_("Choose easing curves for moves and application launches."),
 				WMWidgetView(panel->effectsF));
@@ -686,7 +689,7 @@ static void createPanel(Panel * p)
 	WMMoveWidget(panel->launchEffectP, 160, 46);
 
 	panel->showContentB = WMCreateSwitchButton(panel->effectsF);
-	WMResizeWidget(panel->showContentB, 330, 23);
+	WMResizeWidget(panel->showContentB, 330, 40);
 	WMMoveWidget(panel->showContentB, 12, 72);
 	WMSetButtonText(panel->showContentB,
 	_("Show window contents during animations"));
