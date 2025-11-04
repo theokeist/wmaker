@@ -23,13 +23,14 @@
 
 
 static const struct {
-	const char *db_value;
-	const char *label;
+        const char *db_value;
+        const char *label;
 } icon_animation[] = {
-	{ "zoom",  N_("Shrinking/Zooming") },
-	{ "twist", N_("Spinning/Twisting") },
-	{ "flip",  N_("3D-flipping") },
-	{ "none",  N_("None") }
+        { "zoom",  N_("Shrinking/Zooming") },
+        { "twist", N_("Spinning/Twisting") },
+        { "flip",  N_("3D-flipping") },
+        { "glide", N_("Glide with contents (best with compositor)") },
+        { "none",  N_("None") }
 };
 
 /*

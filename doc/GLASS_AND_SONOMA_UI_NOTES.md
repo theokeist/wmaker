@@ -120,6 +120,10 @@ framebuffer. To make the most of that compositor:
    widgets.
 3. **Fallback detection** – if no compositor is present, skip translucency and render
    using the existing opaque theme path to avoid visual glitches.
+4. **Glide animations** – the new *Glide* iconification style drives an ARGB overlay
+   window with `_NET_WM_WINDOW_OPACITY`, letting compositors fade snapshots smoothly
+   during minimize/restore. Without a compositor the fallback outline path keeps
+   animations responsive without translucency.
 
 ## 8. Implementation order and validation
 

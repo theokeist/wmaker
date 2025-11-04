@@ -182,15 +182,31 @@ void slide_windows_with_curve(Window wins[], int n, int from_x, int from_y, int 
 		{ICON_SLIDE_DELAY_US, ICON_SLIDE_STEPS_US, ICON_SLIDE_SLOWDOWN_US}
 	};
 
-	slide_slowdown = apars[(int)wPreferences.icon_slide_speed].slowdown;
-	slide_steps = apars[(int)wPreferences.icon_slide_speed].steps;
-	slide_delay = apars[(int)wPreferences.icon_slide_speed].delay;
+        slide_slowdown = apars[(int)wPreferences.icon_slide_speed].slowdown;
+        slide_steps = apars[(int)wPreferences.icon_slide_speed].steps;
+        slide_delay = apars[(int)wPreferences.icon_slide_speed].delay;
 
 	dx_int = to_x - from_x;
 	dy_int = to_y - from_y;
 
-	if (dx_int == 0 && dy_int == 0)
-		return;
+        if (dx_int == 0 && dy_int == 0)
+                return;
+
+        {
+                int distance = WMAX(abs(dx_int), abs(dy_int));
+
+                if (distance < ICON_SIZE) {
+                        slide_steps = WMAX(2, slide_steps / 2);
+                        slide_delay = slide_delay / 2;
+                }
+                if (distance < ICON_SIZE / 2) {
+                        slide_steps = WMAX(1, slide_steps / 3);
+                        slide_delay = slide_delay / 3;
+                }
+        }
+
+        if (slide_steps <= 0)
+                slide_steps = 1;
 	is_dx_nul = (dx_int == 0);
 	is_dy_nul = (dy_int == 0);
 	dx = (float) dx_int;
@@ -203,12 +219,12 @@ void slide_windows_with_curve(Window wins[], int n, int from_x, int from_y, int 
 	if (curve < WMEFFECT_CURVE_CLASSIC || curve > WMEFFECT_CURVE_GENTLE)
 		curve = WMEFFECT_CURVE_CLASSIC;
 
-	if (curve != WMEFFECT_CURVE_CLASSIC) {
-		int last_ix = from_x;
-		int last_iy = from_y;
-		int step;
+        if (curve != WMEFFECT_CURVE_CLASSIC) {
+                int last_ix = from_x;
+                int last_iy = from_y;
+                int step;
 
-		for (step = 1; step <= slide_steps; step++) {
+                for (step = 1; step <= slide_steps; step++) {
 			double progress = (double)step / (double)slide_steps;
 			double eased = REffectProgressForCurve((REffectCurve)curve, progress);
 			double target_x = from_x + dx * eased;
@@ -559,8 +575,8 @@ char *ExpandOptions(WScreen *scr, const char *cmdline)
 	char *out, *nout;
 	char *selection = NULL;
 	char *user_input = NULL;
-	char tmpbuf[TMPBUFSIZE];
-	int slen;
+        char tmpbuf[TMPBUFSIZE];
+        int slen;
 
 	len = strlen(cmdline);
 	olen = len + 1;
@@ -705,10 +721,55 @@ char *ExpandOptions(WScreen *scr, const char *cmdline)
 				optr += slen;
 				break;
 
-			default:
-				out[optr++] = '%';
-				out[optr++] = cmdline[ptr];
-			}
+                        case 'u':
+                        case 'U':
+                        case 'f':
+                        case 'F':
+                        {
+                                const char *payload = NULL;
+#define TRIM_TRAILING_SPACE()                                                      \
+        do {                                                                       \
+                while (optr > 0 && (out[optr - 1] == ' ' || out[optr - 1] == '\t')) { \
+                        optr--;                                                     \
+                        out[optr] = '\0';                                          \
+                }                                                                  \
+        } while (0)
+#ifdef USE_DOCK_XDND
+                                if ((cmdline[ptr] == 'F' || cmdline[ptr] == 'U') && scr->xdestring && scr->xdestring[0])
+                                        payload = scr->xdestring;
+#endif
+                                if (!payload) {
+                                        if (!selection)
+                                                selection = getselection(scr);
+                                        payload = selection;
+                                }
+
+                                if (payload && payload[0]) {
+                                        slen = strlen(payload);
+                                        olen += slen;
+                                        nout = realloc(out, olen);
+                                        if (!nout) {
+                                                tmpbuf[0] = '%';
+                                                tmpbuf[1] = cmdline[ptr];
+                                                tmpbuf[2] = '\0';
+                                                wwarning(_("out of memory during expansion of '%s' for command \"%s\""), tmpbuf, cmdline);
+                                                goto error;
+                                        }
+                                        out = nout;
+                                        strcat(out, payload);
+                                        optr += slen;
+                                } else {
+                                        TRIM_TRAILING_SPACE();
+                                }
+                                /* macro only used within this scope */
+#undef TRIM_TRAILING_SPACE
+                                break;
+                        }
+
+                        default:
+                                out[optr++] = '%';
+                                out[optr++] = cmdline[ptr];
+                        }
 			break;
 		}
 		out[optr] = 0;

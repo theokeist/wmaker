@@ -30,7 +30,12 @@ the freshly built binaries are used.
    the same helpers the core window manager now uses for dock previews.
 5. Visit **Window Handling ▸ Window animations** and choose easing curves for
    window moves and application launches; the pop-ups write their selection
-   straight to the defaults database for the core to consume.
+   straight to the defaults database for the core to consume. Enable
+   **Show window contents during animations** to capture snapshots for rich
+   minimize/restore effects.
+6. Hop back to **Icons ▸ Iconification Animation** and pick the new
+   *Glide* style—paired with the content toggle above it drives the ARGB
+   overlay used by the compositor-friendly minimize animation.
 
 These panels are powered by the WINGs toolkit, but the actual pixel work is
 handled by the raster library. The integration mirrors how a full GNUstep

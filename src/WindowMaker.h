@@ -160,8 +160,9 @@ typedef enum {
 #define WIS_ZOOM        0
 #define WIS_TWIST       1
 #define WIS_FLIP        2
-#define WIS_NONE        3
-#define WIS_RANDOM	4 /* secret */
+#define WIS_GLIDE       3
+#define WIS_NONE        4
+#define WIS_RANDOM	5 /* secret */
 
 /* switchmenu actions */
 #define ACTION_ADD		0

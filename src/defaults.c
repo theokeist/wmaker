@@ -259,12 +259,13 @@ static WOptionEnumeration seMouseWheelActions[] = {
 };
 
 static WOptionEnumeration seIconificationStyles[] = {
-	{"Zoom", WIS_ZOOM, 0},
-	{"Twist", WIS_TWIST, 0},
-	{"Flip", WIS_FLIP, 0},
-	{"None", WIS_NONE, 0},
-	{"random", WIS_RANDOM, 0},
-	{NULL, 0, 0}
+        {"Zoom", WIS_ZOOM, 0},
+        {"Twist", WIS_TWIST, 0},
+        {"Flip", WIS_FLIP, 0},
+        {"Glide", WIS_GLIDE, 0},
+        {"None", WIS_NONE, 0},
+        {"random", WIS_RANDOM, 0},
+        {NULL, 0, 0}
 };
 
 static WOptionEnumeration seJustifications[] = {

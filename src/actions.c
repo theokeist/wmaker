@@ -25,10 +25,12 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <math.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "WindowMaker.h"
@@ -1065,24 +1067,184 @@ void wUnfullscreenWindow(WWindow *wwin)
 }
 
 #ifdef USE_ANIMATIONS
-static Bool animateResizeWithContents(WWindow *wwin, RImage *snapshot,
-				       int x, int y, int w, int h,
-				       int fx, int fy, int fw, int fh)
+static Bool animateResizeGlideWithContents(WWindow *wwin, RImage *snapshot,
+                                           int x, int y, int w, int h,
+                                           int fx, int fy, int fw, int fh)
 {
-	int style = wPreferences.iconification_style;
-	WScreen *scr = wwin->screen_ptr;
-	Display *display = dpy;
-	XSetWindowAttributes attr;
+        WScreen *scr = wwin->screen_ptr;
+        Display *display = dpy;
+        Window overlay;
+        XSetWindowAttributes attr;
+        GC gc;
+        Atom opacity_atom;
+        int steps = MINIATURIZE_ANIMATION_STEPS_GLIDE;
+        int delay = MINIATURIZE_ANIMATION_DELAY_GLIDE;
+        int prev_w = -1, prev_h = -1;
+        Pixmap pix = None;
+        RImage *scaled = NULL;
+        Bool success = True;
+
+        if (!snapshot || steps <= 0)
+                return False;
+
+        if (w <= 0)
+                w = 1;
+        if (h <= 0)
+                h = 1;
+        if (fw <= 0)
+                fw = 1;
+        if (fh <= 0)
+                fh = 1;
+
+        attr.override_redirect = True;
+        attr.save_under = True;
+        overlay = XCreateWindow(display, scr->root_win, x, y, w, h, 0,
+                                 CopyFromParent, InputOutput, CopyFromParent,
+                                 CWOverrideRedirect | CWSaveUnder, &attr);
+        if (!overlay)
+                return False;
+
+        gc = XCreateGC(display, overlay, 0, NULL);
+        if (!gc) {
+                XDestroyWindow(display, overlay);
+                return False;
+        }
+
+        opacity_atom = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
+
+        XMapRaised(display, overlay);
+        XGrabServer(display);
+
+        for (int step = 0; step <= steps; step++) {
+                double t = (double)step / (double)steps;
+                double eased = REffectProgressForCurve((REffectCurve)wPreferences.launch_effect, t);
+                double fade = 1.0 - (0.4 * eased);
+                uint32_t opacity;
+                int cur_w, cur_h, cur_x, cur_y;
+
+                if (fade < 0.0)
+                        fade = 0.0;
+                if (fade > 1.0)
+                        fade = 1.0;
+
+                opacity = (uint32_t)((double)0xffffffffu * fade);
+                if (opacity_atom != None)
+                        XChangeProperty(display, overlay, opacity_atom, XA_CARDINAL, 32,
+                                        PropModeReplace, (unsigned char *)&opacity, 1);
+
+                cur_w = w + (int)((fw - w) * eased + 0.5);
+                cur_h = h + (int)((fh - h) * eased + 0.5);
+                cur_x = x + (int)((fx - x) * eased + 0.5);
+                cur_y = y + (int)((fy - y) * eased + 0.5);
+
+                if (cur_w <= 0)
+                        cur_w = 1;
+                if (cur_h <= 0)
+                        cur_h = 1;
+
+                if (cur_w != prev_w || cur_h != prev_h) {
+                        if (pix != None)
+                                XFreePixmap(display, pix);
+                        if (scaled)
+                                RReleaseImage(scaled);
+
+                        if (snapshot->width == (unsigned)cur_w && snapshot->height == (unsigned)cur_h)
+                                scaled = RRetainImage(snapshot);
+                        else
+                                scaled = RScaleImage(snapshot, cur_w, cur_h);
+
+                        if (!scaled) {
+                                success = False;
+                                break;
+                        }
+
+                        if (!RConvertImage(scr->rcontext, scaled, &pix)) {
+                                RReleaseImage(scaled);
+                                scaled = NULL;
+                                success = False;
+                                break;
+                        }
+
+                        prev_w = cur_w;
+                        prev_h = cur_h;
+                }
+
+                XResizeWindow(display, overlay, cur_w, cur_h);
+                XMoveWindow(display, overlay, cur_x, cur_y);
+
+                if (pix != None)
+                        XCopyArea(display, pix, overlay, gc, 0, 0, cur_w, cur_h, 0, 0);
+
+                XFlush(display);
+                if (delay > 0)
+                        wusleep(delay);
+        }
+
+        XUngrabServer(display);
+        XUnmapWindow(display, overlay);
+
+        if (pix != None)
+                XFreePixmap(display, pix);
+        if (scaled)
+                RReleaseImage(scaled);
+
+        XFreeGC(display, gc);
+        XDestroyWindow(display, overlay);
+        XFlush(display);
+
+        return success;
+}
+
+static void animateResizeGlideOutline(WScreen *scr, int x, int y, int w, int h,
+                                      int fx, int fy, int fw, int fh)
+{
+        int steps = MINIATURIZE_ANIMATION_STEPS_GLIDE;
+        int delay = MINIATURIZE_ANIMATION_DELAY_GLIDE;
+
+        if (steps <= 0)
+                return;
+
+        XGrabServer(dpy);
+        for (int step = 0; step <= steps; step++) {
+                double t = (double)step / (double)steps;
+                double eased = REffectProgressForCurve((REffectCurve)wPreferences.launch_effect, t);
+                int cur_x = x + (int)((fx - x) * eased + 0.5);
+                int cur_y = y + (int)((fy - y) * eased + 0.5);
+                int cur_w = w + (int)((fw - w) * eased + 0.5);
+                int cur_h = h + (int)((fh - h) * eased + 0.5);
+
+                XDrawRectangle(dpy, scr->root_win, scr->frame_gc, cur_x, cur_y, cur_w, cur_h);
+                XFlush(dpy);
+
+                if (delay > 0)
+                        wusleep(delay);
+
+                XDrawRectangle(dpy, scr->root_win, scr->frame_gc, cur_x, cur_y, cur_w, cur_h);
+        }
+        XUngrabServer(dpy);
+}
+
+static Bool animateResizeWithContents(WWindow *wwin, RImage *snapshot,
+                                      int x, int y, int w, int h,
+                                      int fx, int fy, int fw, int fh)
+{
+        int style = wPreferences.iconification_style;
+        WScreen *scr = wwin->screen_ptr;
+        Display *display = dpy;
+        XSetWindowAttributes attr;
 	Window overlay;
 	GC gc;
 	Bool success = True;
 	int steps;
 
-	if (!snapshot)
-		return False;
+        if (!snapshot)
+                return False;
 
-	if (style == WIS_RANDOM || style != WIS_ZOOM)
-		return False;
+        if (style == WIS_GLIDE)
+                return animateResizeGlideWithContents(wwin, snapshot, x, y, w, h, fx, fy, fw, fh);
+
+        if (style == WIS_RANDOM || style != WIS_ZOOM)
+                return False;
 
 	steps = MINIATURIZE_ANIMATION_STEPS_Z;
 	if (steps <= 0)
@@ -1351,25 +1513,28 @@ void animateResize(WScreen *scr, int x, int y, int w, int h, int fx, int fy, int
 	if (style == WIS_NONE)
 		return;
 
-	if (style == WIS_RANDOM)
-		style = rand() % 3;
+        if (style == WIS_RANDOM)
+                style = rand() % 4;
 
-	switch (style) {
-	case WIS_TWIST:
-		steps = MINIATURIZE_ANIMATION_STEPS_T;
-		if (steps > 0)
-			animateResizeTwist(scr, x, y, w, h, fx, fy, fw, fh, steps);
-		break;
-	case WIS_FLIP:
-		steps = MINIATURIZE_ANIMATION_STEPS_F;
-		if (steps > 0)
-			animateResizeFlip(scr, x, y, w, h, fx, fy, fw, fh, steps);
-		break;
-	case WIS_ZOOM:
-	default:
-		steps = MINIATURIZE_ANIMATION_STEPS_Z;
-		if (steps > 0)
-			animateResizeZoom(scr, x, y, w, h, fx, fy, fw, fh, steps);
+        switch (style) {
+        case WIS_TWIST:
+                steps = MINIATURIZE_ANIMATION_STEPS_T;
+                if (steps > 0)
+                        animateResizeTwist(scr, x, y, w, h, fx, fy, fw, fh, steps);
+                break;
+        case WIS_FLIP:
+                steps = MINIATURIZE_ANIMATION_STEPS_F;
+                if (steps > 0)
+                        animateResizeFlip(scr, x, y, w, h, fx, fy, fw, fh, steps);
+                break;
+        case WIS_GLIDE:
+                animateResizeGlideOutline(scr, x, y, w, h, fx, fy, fw, fh);
+                break;
+        case WIS_ZOOM:
+        default:
+                steps = MINIATURIZE_ANIMATION_STEPS_Z;
+                if (steps > 0)
+                        animateResizeZoom(scr, x, y, w, h, fx, fy, fw, fh, steps);
 		break;
 	}
 }
