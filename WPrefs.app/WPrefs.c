@@ -72,6 +72,8 @@ static void loadConfigurations(WMScreen * scr, WMWindow * mainw);
 static void savePanelData(Panel * panel);
 
 static void prepareForClose(void);
+static void updateMainWindowLayout(void);
+static void handleMainWindowResize(void *self, WMNotification *notif);
 
 static noreturn void quit(WMWidget *w, void *data)
 {
@@ -203,24 +205,26 @@ static void toggleBalloons(WMWidget *w, void *data)
 
 static void createMainWindow(WMScreen * scr)
 {
-	WMScroller *scroller;
-	WMFont *font;
-	char buffer[128];
+        WMScroller *scroller;
+        WMFont *font;
+        char buffer[128];
+        const int sideMargin = 10;
+        const int initialWidth = FRAME_WIDTH + sideMargin * 2;
+        const int initialHeight = 520;
 
-	WPrefs.win = WMCreateWindow(scr, "wprefs");
-	WMResizeWidget(WPrefs.win, 520, 510);
-	WMSetWindowTitle(WPrefs.win, _("Window Maker Preferences"));
-	WMSetWindowCloseAction(WPrefs.win, quit, NULL);
-	WMSetWindowMaxSize(WPrefs.win, 520, 510);
-	WMSetWindowMinSize(WPrefs.win, 520, 510);
-	WMSetWindowMiniwindowTitle(WPrefs.win, _("Preferences"));
+        WPrefs.win = WMCreateWindow(scr, "wprefs");
+        WMResizeWidget(WPrefs.win, initialWidth, initialHeight);
+        WMSetWindowTitle(WPrefs.win, _("Window Maker Preferences"));
+        WMSetWindowCloseAction(WPrefs.win, quit, NULL);
+        WMSetWindowMinSize(WPrefs.win, initialWidth, initialHeight);
+        WMSetWindowMiniwindowTitle(WPrefs.win, _("Preferences"));
 
-	WPrefs.scrollV = WMCreateScrollView(WPrefs.win);
-	WMResizeWidget(WPrefs.scrollV, 500, 87);
-	WMMoveWidget(WPrefs.scrollV, 10, 10);
-	WMSetScrollViewRelief(WPrefs.scrollV, WRSunken);
-	WMSetScrollViewHasHorizontalScroller(WPrefs.scrollV, True);
-	WMSetScrollViewHasVerticalScroller(WPrefs.scrollV, False);
+        WPrefs.scrollV = WMCreateScrollView(WPrefs.win);
+        WMResizeWidget(WPrefs.scrollV, initialWidth - (sideMargin * 2), 87);
+        WMMoveWidget(WPrefs.scrollV, sideMargin, sideMargin);
+        WMSetScrollViewRelief(WPrefs.scrollV, WRSunken);
+        WMSetScrollViewHasHorizontalScroller(WPrefs.scrollV, True);
+        WMSetScrollViewHasVerticalScroller(WPrefs.scrollV, False);
 	scroller = WMGetScrollViewHorizontalScroller(WPrefs.scrollV);
 	WMSetScrollerArrowsPosition(scroller, WSANone);
 
@@ -229,33 +233,33 @@ static void createMainWindow(WMScreen * scr)
 
 	WMSetScrollViewContentView(WPrefs.scrollV, WMWidgetView(WPrefs.buttonF));
 
-	WPrefs.undosBtn = WMCreateCommandButton(WPrefs.win);
-	WMResizeWidget(WPrefs.undosBtn, 90, 28);
-	WMMoveWidget(WPrefs.undosBtn, 135, 470);
+        WPrefs.undosBtn = WMCreateCommandButton(WPrefs.win);
+        WMResizeWidget(WPrefs.undosBtn, 90, 28);
+        WMMoveWidget(WPrefs.undosBtn, 135, initialHeight - 40);
 	WMSetButtonText(WPrefs.undosBtn, _("Revert Page"));
 	WMSetButtonAction(WPrefs.undosBtn, undo, NULL);
 
-	WPrefs.undoBtn = WMCreateCommandButton(WPrefs.win);
-	WMResizeWidget(WPrefs.undoBtn, 90, 28);
-	WMMoveWidget(WPrefs.undoBtn, 235, 470);
+        WPrefs.undoBtn = WMCreateCommandButton(WPrefs.win);
+        WMResizeWidget(WPrefs.undoBtn, 90, 28);
+        WMMoveWidget(WPrefs.undoBtn, 235, initialHeight - 40);
 	WMSetButtonText(WPrefs.undoBtn, _("Revert All"));
 	WMSetButtonAction(WPrefs.undoBtn, undoAll, NULL);
 
-	WPrefs.saveBtn = WMCreateCommandButton(WPrefs.win);
-	WMResizeWidget(WPrefs.saveBtn, 80, 28);
-	WMMoveWidget(WPrefs.saveBtn, 335, 470);
+        WPrefs.saveBtn = WMCreateCommandButton(WPrefs.win);
+        WMResizeWidget(WPrefs.saveBtn, 80, 28);
+        WMMoveWidget(WPrefs.saveBtn, initialWidth - 145, initialHeight - 40);
 	WMSetButtonText(WPrefs.saveBtn, _("Save"));
 	WMSetButtonAction(WPrefs.saveBtn, save, NULL);
 
-	WPrefs.closeBtn = WMCreateCommandButton(WPrefs.win);
-	WMResizeWidget(WPrefs.closeBtn, 80, 28);
-	WMMoveWidget(WPrefs.closeBtn, 425, 470);
+        WPrefs.closeBtn = WMCreateCommandButton(WPrefs.win);
+        WMResizeWidget(WPrefs.closeBtn, 80, 28);
+        WMMoveWidget(WPrefs.closeBtn, initialWidth - 55, initialHeight - 40);
 	WMSetButtonText(WPrefs.closeBtn, _("Close"));
 	WMSetButtonAction(WPrefs.closeBtn, quit, NULL);
 
-	WPrefs.balloonBtn = WMCreateSwitchButton(WPrefs.win);
-	WMResizeWidget(WPrefs.balloonBtn, 200, 28);
-	WMMoveWidget(WPrefs.balloonBtn, 15, 470);
+        WPrefs.balloonBtn = WMCreateSwitchButton(WPrefs.win);
+        WMResizeWidget(WPrefs.balloonBtn, 200, 28);
+        WMMoveWidget(WPrefs.balloonBtn, sideMargin + 5, initialHeight - 40);
 	WMSetButtonText(WPrefs.balloonBtn, _("Balloon Help"));
 	WMSetButtonAction(WPrefs.balloonBtn, toggleBalloons, NULL);
 	{
@@ -267,39 +271,120 @@ static void createMainWindow(WMScreen * scr)
 	}
 
 	/* banner */
-	WPrefs.banner = WMCreateFrame(WPrefs.win);
-	WMResizeWidget(WPrefs.banner, FRAME_WIDTH, FRAME_HEIGHT);
-	WMMoveWidget(WPrefs.banner, FRAME_LEFT, FRAME_TOP);
+        WPrefs.banner = WMCreateFrame(WPrefs.win);
+        WMResizeWidget(WPrefs.banner, FRAME_WIDTH, FRAME_HEIGHT);
+        WMMoveWidget(WPrefs.banner, FRAME_LEFT + sideMargin, FRAME_TOP);
 	WMSetFrameRelief(WPrefs.banner, WRFlat);
 
 	font = WMCreateFont(scr, "Lucida Sans,URW Gothic L,Times New Roman,serif"
 			    ":bold:pixelsize=26:antialias=true");
-	WPrefs.nameL = WMCreateLabel(WPrefs.banner);
-	WMSetLabelTextAlignment(WPrefs.nameL, WACenter);
-	WMResizeWidget(WPrefs.nameL, FRAME_WIDTH - 20, 60);
+        WPrefs.nameL = WMCreateLabel(WPrefs.banner);
+        WMSetLabelTextAlignment(WPrefs.nameL, WACenter);
+        WMResizeWidget(WPrefs.nameL, FRAME_WIDTH - 20, 60);
 	WMMoveWidget(WPrefs.nameL, 10, 50);
 	WMSetLabelFont(WPrefs.nameL, font);
 	WMSetLabelText(WPrefs.nameL, _("Window Maker Preferences"));
 	WMReleaseFont(font);
 
-	WPrefs.versionL = WMCreateLabel(WPrefs.banner);
-	WMResizeWidget(WPrefs.versionL, FRAME_WIDTH - 20, 20);
+        WPrefs.versionL = WMCreateLabel(WPrefs.banner);
+        WMResizeWidget(WPrefs.versionL, FRAME_WIDTH - 20, 20);
 	WMMoveWidget(WPrefs.versionL, 10, 120);
 	WMSetLabelTextAlignment(WPrefs.versionL, WACenter);
 	sprintf(buffer, _("Version %s"), VERSION);
 	WMSetLabelText(WPrefs.versionL, buffer);
 
-	WPrefs.statusL = WMCreateLabel(WPrefs.banner);
-	WMResizeWidget(WPrefs.statusL, FRAME_WIDTH - 20, 60);
+        WPrefs.statusL = WMCreateLabel(WPrefs.banner);
+        WMResizeWidget(WPrefs.statusL, FRAME_WIDTH - 20, 60);
 	WMMoveWidget(WPrefs.statusL, 10, 150);
 	WMSetLabelTextAlignment(WPrefs.statusL, WACenter);
 	WMSetLabelText(WPrefs.statusL, _("Starting..."));
 
-	WMMapSubwidgets(WPrefs.win);
+        updateMainWindowLayout();
 
-	WMUnmapWidget(WPrefs.undosBtn);
-	WMUnmapWidget(WPrefs.undoBtn);
-	WMUnmapWidget(WPrefs.saveBtn);
+        WMMapSubwidgets(WPrefs.win);
+        WMAddNotificationObserver(handleMainWindowResize, NULL,
+                                  WMViewSizeDidChangeNotification,
+                                  WMWidgetView(WPrefs.win));
+
+        WMUnmapWidget(WPrefs.undosBtn);
+        WMUnmapWidget(WPrefs.undoBtn);
+        WMUnmapWidget(WPrefs.saveBtn);
+}
+
+static void updateMainWindowLayout(void)
+{
+        const int sideMargin = 10;
+        const int buttonBottomMargin = 12;
+        const int buttonSpacing = 10;
+        const int buttonHeight = 28;
+        int width;
+        int height;
+        int contentWidth;
+        int bannerWidth;
+        int buttonY;
+        int x;
+
+        if (!WPrefs.win)
+                return;
+
+        width = WMWidgetWidth(WPrefs.win);
+        height = WMWidgetHeight(WPrefs.win);
+        contentWidth = width - (sideMargin * 2);
+
+        if (contentWidth < 0)
+                contentWidth = 0;
+
+        WMResizeWidget(WPrefs.scrollV, contentWidth, WMWidgetHeight(WPrefs.scrollV));
+        WMMoveWidget(WPrefs.scrollV, sideMargin, sideMargin);
+
+        bannerWidth = contentWidth - (FRAME_LEFT * 2);
+        if (bannerWidth < 0)
+                bannerWidth = 0;
+
+        WMMoveWidget(WPrefs.banner, FRAME_LEFT + sideMargin, FRAME_TOP);
+        WMResizeWidget(WPrefs.banner, bannerWidth, FRAME_HEIGHT);
+
+        {
+                int labelWidth = bannerWidth - 20;
+
+                if (labelWidth < 0)
+                        labelWidth = 0;
+
+                WMResizeWidget(WPrefs.nameL, labelWidth, 60);
+                WMResizeWidget(WPrefs.versionL, labelWidth, 20);
+                WMResizeWidget(WPrefs.statusL, labelWidth, 60);
+        }
+
+        buttonY = height - buttonBottomMargin - buttonHeight;
+        if (buttonY < FRAME_TOP + FRAME_HEIGHT + 10)
+                buttonY = FRAME_TOP + FRAME_HEIGHT + 10;
+
+        WMMoveWidget(WPrefs.balloonBtn, sideMargin + 5, buttonY);
+
+        x = width - sideMargin - WMWidgetWidth(WPrefs.closeBtn);
+        WMMoveWidget(WPrefs.closeBtn, x, buttonY);
+
+        x -= buttonSpacing + WMWidgetWidth(WPrefs.saveBtn);
+        WMMoveWidget(WPrefs.saveBtn, x, buttonY);
+
+        x -= buttonSpacing + WMWidgetWidth(WPrefs.undoBtn);
+        WMMoveWidget(WPrefs.undoBtn, x, buttonY);
+
+        x -= buttonSpacing + WMWidgetWidth(WPrefs.undosBtn);
+        WMMoveWidget(WPrefs.undosBtn, x, buttonY);
+}
+
+static void handleMainWindowResize(void *self, WMNotification *notif)
+{
+        (void)self;
+
+        if (WMGetNotificationName(notif) != WMViewSizeDidChangeNotification)
+                return;
+
+        if (WMGetNotificationObject(notif) != WMWidgetView(WPrefs.win))
+                return;
+
+        updateMainWindowLayout();
 }
 
 static void showPanel(Panel * panel)

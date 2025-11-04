@@ -188,6 +188,9 @@ void slide_windows_with_curve(Window wins[], int n, int from_x, int from_y, int 
 
 	dx_int = to_x - from_x;
 	dy_int = to_y - from_y;
+
+	if (dx_int == 0 && dy_int == 0)
+		return;
 	is_dx_nul = (dx_int == 0);
 	is_dy_nul = (dy_int == 0);
 	dx = (float) dx_int;

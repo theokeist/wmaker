@@ -928,10 +928,17 @@ static void switchWSCommand(WMenu *menu, WMenuEntry *entry)
 
 static void launchDockedApplication(WAppIcon *btn, Bool withSelection)
 {
-	WScreen *scr = btn->icon->core->screen_ptr;
+        WScreen *scr = btn->icon->core->screen_ptr;
 
-	if (!btn->launching &&
-	    ((!withSelection && btn->command != NULL) || (withSelection && btn->paste_command != NULL))) {
+        if (btn->running && (!btn->main_window || !wApplicationOf(btn->main_window))) {
+                btn->running = 0;
+                btn->relaunching = 0;
+                btn->launching = 0;
+                btn->main_window = None;
+        }
+
+        if (!btn->launching &&
+            ((!withSelection && btn->command != NULL) || (withSelection && btn->paste_command != NULL))) {
 		if (!btn->forced_dock) {
 			btn->relaunching = btn->running;
 			btn->running = 1;

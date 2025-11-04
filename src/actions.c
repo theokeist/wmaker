@@ -1532,56 +1532,56 @@ void wIconifyWindow(WWindow *wwin)
 			     GrabModeAsync, None, None, CurrentTime);
 	}
 
-	if (!wPreferences.disable_miniwindows && !wwin->flags.net_handle_icon) {
-		if (!wwin->flags.icon_moved)
-			PlaceIcon(wwin->screen_ptr, &wwin->icon_x, &wwin->icon_y, wGetHeadForWindow(wwin));
+        if (!wPreferences.disable_miniwindows && !wwin->flags.net_handle_icon) {
+                if (!wwin->flags.icon_moved)
+                        PlaceIcon(wwin->screen_ptr, &wwin->icon_x, &wwin->icon_y, wGetHeadForWindow(wwin));
 
-		wwin->icon = icon_create_for_wwindow(wwin);
-		wwin->icon->mapped = 1;
+                wwin->icon = icon_create_for_wwindow(wwin);
+                wwin->icon->mapped = 1;
 
-		/* extract the window screenshot every time, as the option can be enable anytime */
-		if (wwin->client_win && wwin->flags.mapped) {
-			RImage *mini_preview;
-			XImage *pimg;
-			unsigned int w, h;
-			int x, y;
-			Window baz;
+                if (wPreferences.show_window_contents_in_animations &&
+                    wwin->client_win && wwin->flags.mapped) {
+                        RImage *mini_preview;
+                        XImage *pimg;
+                        unsigned int w, h;
+                        int x, y;
+                        Window baz;
 
-			XRaiseWindow(dpy, wwin->frame->core->window);
-			XTranslateCoordinates(dpy, wwin->client_win, wwin->screen_ptr->root_win, 0, 0, &x, &y, &baz);
+                        XRaiseWindow(dpy, wwin->frame->core->window);
+                        XTranslateCoordinates(dpy, wwin->client_win, wwin->screen_ptr->root_win, 0, 0, &x, &y, &baz);
 
-			w = attribs.width;
-			h = attribs.height;
+                        w = attribs.width;
+                        h = attribs.height;
 
-			if (x - attribs.x + attribs.width > wwin->screen_ptr->scr_width)
-				w = wwin->screen_ptr->scr_width - x + attribs.x;
+                        if (x - attribs.x + attribs.width > wwin->screen_ptr->scr_width)
+                                w = wwin->screen_ptr->scr_width - x + attribs.x;
 
-			if (y - attribs.y + attribs.height > wwin->screen_ptr->scr_height)
-				h = wwin->screen_ptr->scr_height - y + attribs.y;
+                        if (y - attribs.y + attribs.height > wwin->screen_ptr->scr_height)
+                                h = wwin->screen_ptr->scr_height - y + attribs.y;
 
-			pimg = XGetImage(dpy, wwin->client_win, 0, 0, w, h, AllPlanes, ZPixmap);
-			if (pimg) {
-				mini_preview = RCreateImageFromXImage(wwin->screen_ptr->rcontext, pimg, NULL);
-				XDestroyImage(pimg);
+                        pimg = XGetImage(dpy, wwin->client_win, 0, 0, w, h, AllPlanes, ZPixmap);
+                        if (pimg) {
+                                mini_preview = RCreateImageFromXImage(wwin->screen_ptr->rcontext, pimg, NULL);
+                                XDestroyImage(pimg);
 
-				if (mini_preview) {
-					set_icon_minipreview(wwin->icon, mini_preview);
-					RReleaseImage(mini_preview);
-				} else {
-					const char *title;
-					char title_buf[32];
+                                if (mini_preview) {
+                                        set_icon_minipreview(wwin->icon, mini_preview);
+                                        RReleaseImage(mini_preview);
+                                } else {
+                                        const char *title;
+                                        char title_buf[32];
 
-					if (wwin->frame->title) {
-						title = wwin->frame->title;
-					} else {
-						snprintf(title_buf, sizeof(title_buf), "(id=0x%lx)", wwin->client_win);
-						title = title_buf;
-					}
-					wwarning(_("creation of mini-preview failed for window \"%s\""), title);
-				}
-			}
-		}
-	}
+                                        if (wwin->frame->title) {
+                                                title = wwin->frame->title;
+                                        } else {
+                                                snprintf(title_buf, sizeof(title_buf), "(id=0x%lx)", wwin->client_win);
+                                                title = title_buf;
+                                        }
+                                        wwarning(_("creation of mini-preview failed for window \"%s\""), title);
+                                }
+                        }
+                }
+        }
 
 	wwin->flags.miniaturized = 1;
 	wwin->flags.mapped = 0;
