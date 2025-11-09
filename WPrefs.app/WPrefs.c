@@ -31,6 +31,7 @@
 
 #define MAX_SECTIONS 24
 #define NAV_BUTTON_SIZE 64
+#define NAV_SCROLL_PADDING 23
 #define MAIN_WINDOW_SIDE_MARGIN 10
 #define INITIAL_WINDOW_HEIGHT 520
 
@@ -224,11 +225,12 @@ static void createMainWindow(WMScreen * scr)
         WMSetWindowMiniwindowTitle(WPrefs.win, _("Preferences"));
 
         WPrefs.scrollV = WMCreateScrollView(WPrefs.win);
-        WMResizeWidget(WPrefs.scrollV, initialWidth - (sideMargin * 2), 87);
+        WMResizeWidget(WPrefs.scrollV, initialWidth - (sideMargin * 2),
+                       NAV_BUTTON_SIZE + NAV_SCROLL_PADDING);
         WMMoveWidget(WPrefs.scrollV, sideMargin, sideMargin);
         WMSetScrollViewRelief(WPrefs.scrollV, WRSunken);
         WMSetScrollViewHasHorizontalScroller(WPrefs.scrollV, True);
-        WMSetScrollViewHasVerticalScroller(WPrefs.scrollV, False);
+        WMSetScrollViewHasVerticalScroller(WPrefs.scrollV, True);
 	scroller = WMGetScrollViewHorizontalScroller(WPrefs.scrollV);
 	WMSetScrollerArrowsPosition(scroller, WSANone);
 
@@ -397,15 +399,34 @@ static void updateMainWindowLayout(void)
         if (contentWidth < 0)
                 contentWidth = 0;
 
-        WMResizeWidget(WPrefs.scrollV, contentWidth, WMWidgetHeight(WPrefs.scrollV));
-        WMMoveWidget(WPrefs.scrollV, sideMargin, sideMargin);
+        {
+                const int navHeight = NAV_BUTTON_SIZE + NAV_SCROLL_PADDING;
+
+                WMResizeWidget(WPrefs.scrollV, contentWidth, navHeight);
+                WMMoveWidget(WPrefs.scrollV, sideMargin, sideMargin);
+        }
 
         bannerWidth = contentWidth - (FRAME_LEFT * 2);
         if (bannerWidth < 0)
                 bannerWidth = 0;
 
-        WMMoveWidget(WPrefs.banner, FRAME_LEFT + sideMargin, FRAME_TOP);
-        WMResizeWidget(WPrefs.banner, bannerWidth, FRAME_HEIGHT);
+        {
+                const int navHeight = NAV_BUTTON_SIZE + NAV_SCROLL_PADDING;
+                const int contentTop = sideMargin + navHeight + 10;
+                int buttonAreaTop;
+                int bannerHeight;
+
+                buttonAreaTop = height - buttonBottomMargin - buttonHeight;
+                if (buttonAreaTop < contentTop + FRAME_HEIGHT + 10)
+                        buttonAreaTop = contentTop + FRAME_HEIGHT + 10;
+
+                bannerHeight = buttonAreaTop - contentTop - 10;
+                if (bannerHeight < FRAME_HEIGHT)
+                        bannerHeight = FRAME_HEIGHT;
+
+                WMMoveWidget(WPrefs.banner, FRAME_LEFT + sideMargin, contentTop);
+                WMResizeWidget(WPrefs.banner, bannerWidth, bannerHeight);
+        }
 
         {
                 int labelWidth = bannerWidth - 20;
@@ -419,8 +440,14 @@ static void updateMainWindowLayout(void)
         }
 
         buttonY = height - buttonBottomMargin - buttonHeight;
-        if (buttonY < FRAME_TOP + FRAME_HEIGHT + 10)
-                buttonY = FRAME_TOP + FRAME_HEIGHT + 10;
+        {
+                const int navHeight = NAV_BUTTON_SIZE + NAV_SCROLL_PADDING;
+                const int contentTop = sideMargin + navHeight + 10;
+                const int minButtonY = contentTop + FRAME_HEIGHT + 10;
+
+                if (buttonY < minButtonY)
+                        buttonY = minButtonY;
+        }
 
         WMMoveWidget(WPrefs.balloonBtn, sideMargin + 5, buttonY);
 

@@ -374,9 +374,9 @@ static void createPanel(Panel * p)
         WMMapSubwidgets(panel->size.frame);
 
 	/***************** Mini-Previews ****************/
-	panel->minipreview.frame = WMCreateFrame(panel->box);
-	WMResizeWidget(panel->minipreview.frame, 156, 52);
-	WMMoveWidget(panel->minipreview.frame, 124, 168);
+        panel->minipreview.frame = WMCreateFrame(panel->box);
+        WMResizeWidget(panel->minipreview.frame, 156, 52);
+        WMMoveWidget(panel->minipreview.frame, 12, 232);
 	WMSetFrameTitle(panel->minipreview.frame, _("Mini-Previews for Icons"));
 
 	WMSetBalloonTextForView(_("The Mini-Preview provides a small view of the content of the\n"

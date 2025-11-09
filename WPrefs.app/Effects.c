@@ -371,14 +371,16 @@ static void createPanel(Panel *p)
         panel->scrollV = WMCreateScrollView(panel->box);
         WMResizeWidget(panel->scrollV, FRAME_WIDTH - 16, FRAME_HEIGHT - 16);
         WMMoveWidget(panel->scrollV, 8, 8);
+        WMSetViewExpandsToParent(WMWidgetView(panel->scrollV), 8, 8, 8, 8);
         WMSetScrollViewRelief(panel->scrollV, WRSunken);
         WMSetScrollViewHasVerticalScroller(panel->scrollV, True);
-        WMSetScrollViewHasHorizontalScroller(panel->scrollV, False);
+        WMSetScrollViewHasHorizontalScroller(panel->scrollV, True);
 
         panel->contentB = WMCreateBox(panel->box);
         WMSetBoxHorizontal(panel->contentB, False);
         WMSetBoxBorderWidth(panel->contentB, 8);
         WMResizeWidget(panel->contentB, FRAME_WIDTH - 32, 300);
+        WMSetViewExpandsToParent(WMWidgetView(panel->contentB), 0, 0, 0, 0);
 
         WMSetScrollViewContentView(panel->scrollV, WMWidgetView(panel->contentB));
 
