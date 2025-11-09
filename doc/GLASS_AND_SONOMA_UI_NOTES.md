@@ -81,10 +81,10 @@ The following sections map these goals to concrete engineering tasks.
 
 ## 5. Preferences and user control (WPrefs.app)
 
-1. **Appearance panels** – enhance the existing Window Handling and Appearance panels
-   (and add a dedicated Sonoma/Glass panel if needed) with sliders for corner radius,
-   shadow depth, material intensity, and motion strength. Store selections using the
-   schema keys defined above.
+1. **Appearance panels** – enhance the Appearance controls and the dedicated
+   Animations & Effects panel with sliders for corner radius, shadow depth,
+   material intensity, and motion strength. Store selections using the schema keys
+   defined above so both classic and modern looks stay configurable from WPrefs.
 2. **Live previews** – reuse the icon preview infrastructure in `WPrefs.app/Icons.c`
    to render miniature panels/menus that demonstrate the active material and easing
    settings. When possible, sample actual wallpaper pixels via the wrlib helpers so

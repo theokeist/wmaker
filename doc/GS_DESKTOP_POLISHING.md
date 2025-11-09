@@ -9,7 +9,7 @@ The GNUstep Desktop (gs-desktop) experiments with richer desktop polish on top o
 - **Compositable overlays:** Provide helpers that blend highlight glows or drop shadows into pixmaps before they reach X11. This keeps the effects opt-in but lets WPrefs toggle them without each caller duplicating blending math.
 
 ## Core Window Maker
-- **Window choreography:** Expose the new easing defaults through `WindowHandling.c` for move/resize loops, not just dock animations. gs-desktop patches showcase subtle acceleration when dragging windows that reduces perceived lag; adopting similar hooks would reuse the shared transition curves.
+- **Window choreography:** Expose the new easing defaults surfaced by `WPrefs.app/Effects.c` for move/resize loops, not just dock animations. gs-desktop patches showcase subtle acceleration when dragging windows that reduces perceived lag; adopting similar hooks would reuse the shared transition curves.
 - **Workspace and clip polish:** Allow per-workspace background transitions and clip/dock auto-hide animations to opt into the same easing catalog. This keeps right-click menus, dock tiles, and workspace switches feeling part of one design system.
 - **Defaults schema cleanup:** Group the new animation and sampling toggles under a dedicated `VisualEffects` dictionary in the defaults database so WPrefs, dockapps, and external tools can query capabilities without guessing key names.
 
@@ -19,7 +19,7 @@ The GNUstep Desktop (gs-desktop) experiments with richer desktop polish on top o
 - **Theme channels:** Extend the theme loader so gradients, borders, and shadows can describe multi-stop ramps or blur radii, aligning with the richer gs-desktop skins. WINGs would parse these values and hand them to wrlib’s blending helpers.
 
 ## WPrefs.app
-- **Effect inspector:** Expand the existing Window Animations panel (`WPrefs.app/WindowHandling.c`) to preview easing curves side-by-side, similar to gs-desktop’s control center. Embedding the raster helper lets users see launch, close, and workspace transitions before applying them globally.
+- **Effect inspector:** Expand the dedicated Animations & Effects panel (`WPrefs.app/Effects.c`) to preview easing curves side-by-side, similar to gs-desktop’s control center. Embedding the raster helper lets users see launch, close, and workspace transitions before applying them globally.
 - **Icon lab:** Complement the icon-size slider (`WPrefs.app/Icons.c`) with per-source sampling toggles (fast vs. smooth vs. high-quality). gs-desktop exposes this distinction to balance performance on low-end hardware.
 - **Accessibility modes:** Offer preset bundles (e.g., “Reduced Motion,” “High Contrast”) that flip the relevant defaults in one click, inspired by gs-desktop’s accessibility panel. WPrefs can then write consistent defaults keys for dockapps to honor.
 

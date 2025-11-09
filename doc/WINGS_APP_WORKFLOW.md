@@ -38,10 +38,11 @@ how it persists preferences into the user’s defaults domain, reinforcing the
 workflow of editing settings, saving them, and letting Window Maker pick them up
 on restart or live reload.【F:WPrefs.app/README†L1-L57】
 
-Recent updates extend that workflow to animation: the **Window Handling** panel
-now writes easing choices for moves and launches, and the core window manager
-reads those defaults to feed the new wrlib transition curves, keeping UI tweaks
-and rendering ergonomics aligned.【F:WPrefs.app/WindowHandling.c†L38-L336】
+Recent updates extend that workflow to animation: the dedicated
+**Animations & Effects** panel now writes easing choices, compositor
+preferences, and content-capture toggles, and the core window manager reads
+those defaults to feed the shared wrlib transition curves—keeping UI tweaks
+and rendering ergonomics aligned.【F:WPrefs.app/Effects.c†L1-L468】
 
 When the app starts, WINGs constructs the application icon, registers it with the
 dock, and opens panels corresponding to each configuration section. Users can

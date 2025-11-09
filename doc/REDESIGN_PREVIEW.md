@@ -28,11 +28,12 @@ the freshly built binaries are used.
    being locked to 8 px increments.
 4. In the same panel, tweak **Mini-Previews**—the preview swatch is scaled with
    the same helpers the core window manager now uses for dock previews.
-5. Visit **Window Handling ▸ Window animations** and choose easing curves for
+5. Switch to **Effects ▸ Animations & Effects** and choose easing curves for
    window moves and application launches; the pop-ups write their selection
    straight to the defaults database for the core to consume. Enable
-   **Show window contents during animations** to capture snapshots for rich
-   minimize/restore effects.
+   **Show window contents during animations** and pick a compositor (such as
+   Picom) from the same panel to capture snapshots and let the Glide animation
+   fade smoothly when a compositor is running.
 6. Hop back to **Icons ▸ Iconification Animation** and pick the new
    *Glide* style—paired with the content toggle above it drives the ARGB
    overlay used by the compositor-friendly minimize animation.
