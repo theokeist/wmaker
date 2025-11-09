@@ -28,6 +28,8 @@
 #include <stdnoreturn.h>
 #endif
 
+extern void WMScrollViewScrollPoint(WMScrollView *sPtr, WMPoint point);
+
 
 #define MAX_SECTIONS 24
 #define NAV_BUTTON_SIZE 64
@@ -79,6 +81,8 @@ static void prepareForClose(void);
 static void updateMainWindowLayout(void);
 static void handleMainWindowResize(void *self, WMNotification *notif);
 static void layoutSectionButtons(void);
+static void ensureSectionButtonVisible(WMButton *button);
+static WMButton *findButtonForPanel(Panel *panel);
 
 static noreturn void quit(WMWidget *w, void *data)
 {
@@ -376,6 +380,64 @@ static void layoutSectionButtons(void)
         }
 }
 
+static void ensureSectionButtonVisible(WMButton *button)
+{
+        WMRect visible;
+        int contentWidth;
+        int viewportWidth;
+        int buttonLeft;
+        int buttonRight;
+        int targetX;
+        WMView *buttonView;
+
+        if (!button || !WPrefs.scrollV || !WPrefs.buttonF)
+                return;
+
+        visible = WMGetScrollViewVisibleRect(WPrefs.scrollV);
+        contentWidth = WMWidgetWidth(WPrefs.buttonF);
+        viewportWidth = visible.size.width;
+
+        if (contentWidth <= viewportWidth)
+                return;
+
+        buttonView = WMWidgetView(button);
+        buttonLeft = buttonView->pos.x;
+        buttonRight = buttonLeft + buttonView->size.width;
+
+        targetX = visible.pos.x;
+
+        if (buttonLeft < visible.pos.x)
+                targetX = buttonLeft;
+        else if (buttonRight > visible.pos.x + viewportWidth)
+                targetX = buttonRight - viewportWidth;
+
+        if (targetX < 0)
+                targetX = 0;
+
+        if (targetX != visible.pos.x) {
+                WMPoint point;
+
+                point.x = targetX;
+                point.y = visible.pos.y;
+                WMScrollViewScrollPoint(WPrefs.scrollV, point);
+        }
+}
+
+static WMButton *findButtonForPanel(Panel *panel)
+{
+        int i;
+
+        if (!panel)
+                return NULL;
+
+        for (i = 0; i < WPrefs.sectionCount; i++) {
+                if (WMGetHangedData(WPrefs.sectionB[i]) == panel)
+                        return WPrefs.sectionB[i];
+        }
+
+        return NULL;
+}
+
 static void updateMainWindowLayout(void)
 {
         const int sideMargin = MAIN_WINDOW_SIDE_MARGIN;
@@ -517,13 +579,15 @@ static void savePanelData(Panel * panel)
 
 static void changeSection(WMWidget * self, void *data)
 {
-	/* Parameter not used, but tell the compiler that it is ok */
-	(void) self;
+        /* Parameter not used, but tell the compiler that it is ok */
+        (void) self;
 
-	if (WPrefs.currentPanel == data)
-		return;
+        if (WPrefs.currentPanel == data)
+                return;
 
-	if (WPrefs.currentPanel == NULL) {
+        ensureSectionButtonVisible(self ? (WMButton *)self : findButtonForPanel(data));
+
+        if (WPrefs.currentPanel == NULL) {
 		WMDestroyWidget(WPrefs.nameL);
 		WMDestroyWidget(WPrefs.versionL);
 		WMDestroyWidget(WPrefs.statusL);
