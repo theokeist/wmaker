@@ -52,12 +52,13 @@ typedef struct _Panel {
         WMButton *openConfigB;
         WMLabel *hintL;
         WMButton *shadowB;
+        WMButton *autostartB;
 
         int compositorIndex;
         char *configPath;
 } _Panel;
 
-static void syncShadowToggle(_Panel *panel);
+static void syncCompositorControls(_Panel *panel);
 static void layout_effects_panel(_Panel *panel);
 static void effects_panel_resized(void *self, WMNotification *notif);
 static void showEffectsPanel(Panel *panel);
@@ -179,28 +180,32 @@ static void set_config_path(_Panel *panel, const char *path)
                 panel->configPath = wstrdup(path);
 }
 
-static void syncShadowToggle(_Panel *panel)
+static void syncCompositorControls(_Panel *panel)
 {
-        if (!panel->shadowB)
-                return;
+        Bool hasCompositor = (panel->compositorIndex == 1);
 
-        WMSetButtonEnabled(panel->shadowB, panel->compositorIndex == 1);
+        if (panel->shadowB)
+                WMSetButtonEnabled(panel->shadowB, hasCompositor);
+
+        if (panel->autostartB)
+                WMSetButtonEnabled(panel->autostartB, hasCompositor);
 }
 
 static void updateConfigPathLabel(_Panel *panel)
 {
-        if (panel->compositorIndex != 1 || !panel->configPath || panel->configPath[0] == '\0') {
-                if (panel->compositorIndex == 1)
-                        WMSetLabelText(panel->configPathL, _("Picom configuration will be created on demand"));
-                else
-                        WMSetLabelText(panel->configPathL, _("No compositor configuration in use"));
-                WMSetButtonEnabled(panel->openConfigB, False);
+        Bool hasPicom = (panel->compositorIndex == 1);
+        Bool hasConfig = (hasPicom && panel->configPath && panel->configPath[0] != '\0');
+
+        if (!hasPicom) {
+                WMSetLabelText(panel->configPathL, _("No compositor configuration in use"));
+        } else if (!hasConfig) {
+                WMSetLabelText(panel->configPathL, _("Picom configuration will be created on demand"));
         } else {
                 WMSetLabelText(panel->configPathL, panel->configPath);
-                WMSetButtonEnabled(panel->openConfigB, True);
         }
 
-        syncShadowToggle(panel);
+        WMSetButtonEnabled(panel->openConfigB, hasConfig);
+        syncCompositorControls(panel);
 }
 
 static char *quote_for_shell(const char *path)
@@ -375,6 +380,7 @@ static void showData(_Panel *panel)
         panel->compositorIndex = index;
         WMSetPopUpButtonSelectedItem(panel->compositorP, index);
 
+        WMSetButtonSelected(panel->autostartB, GetBoolForKey("AutostartCompositor"));
         WMSetButtonSelected(panel->shadowB, GetBoolForKey("EnableWindowShadows"));
 
         str = GetStringForKey("CompositorConfigPath");
@@ -403,6 +409,7 @@ static void storeData(_Panel *panel)
                       "ShowWindowContentsDuringAnimations");
 
         SetStringForKey(compositor_options[compositor_index].db_value, "PreferredCompositor");
+        SetBoolForKey(WMGetButtonSelected(panel->autostartB), "AutostartCompositor");
         if (panel->configPath && panel->compositorIndex == 1)
                 SetStringForKey(panel->configPath, "CompositorConfigPath");
         else
@@ -551,6 +558,11 @@ static void layout_effects_panel(_Panel *panel)
 
         compY += rowHeight + spacing;
 
+        WMResizeWidget(panel->autostartB, availableWidth, 28);
+        WMMoveWidget(panel->autostartB, innerMargin, compY);
+
+        compY += 28 + spacing;
+
         WMResizeWidget(panel->shadowB, availableWidth, 28);
         WMMoveWidget(panel->shadowB, innerMargin, compY);
 
@@ -682,6 +694,10 @@ static void createPanel(Panel *p)
         WMResizeWidget(panel->configPathL, FRAME_WIDTH - 70, 30);
         WMMoveWidget(panel->configPathL, 10, 50);
         WMSetLabelWraps(panel->configPathL, True);
+
+        panel->autostartB = WMCreateSwitchButton(panel->compositorF);
+        WMSetButtonText(panel->autostartB,
+                        _("Start compositor automatically when Window Maker launches"));
 
         panel->shadowB = WMCreateSwitchButton(panel->compositorF);
         WMSetButtonText(panel->shadowB, _("Enable window shadows (requires compositor)"));

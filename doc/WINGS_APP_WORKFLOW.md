@@ -40,7 +40,8 @@ on restart or live reload.【F:WPrefs.app/README†L1-L57】
 
 Recent updates extend that workflow to animation: the dedicated
 **Animations & Effects** panel now writes easing choices, compositor
-preferences, window-shadow toggles, and content-capture settings, and the core
+preferences, autostart and window-shadow toggles, and content-capture settings,
+and the core
 window manager reads those defaults to feed the shared wrlib transition
 curves—keeping UI tweaks, Picom integration, and rendering ergonomics
 aligned.【F:WPrefs.app/Effects.c†L1-L520】

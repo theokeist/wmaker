@@ -447,6 +447,8 @@ WDefaultEntry optionList[] = {
             &wPreferences.compositor_config_path, getString, NULL, NULL, NULL},
         {"EnableWindowShadows", "YES", NULL,
             &wPreferences.enable_window_shadows, getBool, NULL, NULL, NULL},
+        {"AutostartCompositor", "YES", NULL,
+            &wPreferences.autostart_compositor, getBool, NULL, NULL, NULL},
         {"ShowWindowContentsDuringAnimations", "NO", NULL,
             &wPreferences.show_window_contents_in_animations, getBool, NULL, NULL, NULL},
 	{"ShadeSpeed", "fast", seSpeeds,

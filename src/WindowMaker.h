@@ -457,6 +457,7 @@ extern struct WPreferences {
         signed char compositor_choice;
         char *compositor_config_path;
         char enable_window_shadows;
+        char autostart_compositor;
 
         /* shading animation */
         signed char shade_speed;

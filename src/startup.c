@@ -1010,6 +1010,9 @@ static void startConfiguredCompositor(void)
         if (!wScreen || w_global.screen_count == 0)
                 return;
 
+        if (!wPreferences.autostart_compositor)
+                return;
+
         switch (wPreferences.compositor_choice) {
         case WCOMPOSITOR_PICOM:
                 if (!command_exists("picom")) {

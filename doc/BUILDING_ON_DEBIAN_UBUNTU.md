@@ -33,7 +33,8 @@ sudo apt install \
   libxrender-dev libxpm-dev libxmu-dev libsm-dev libice-dev \
   libfreetype6-dev libfontconfig1-dev libxft-dev \
   libpng-dev libjpeg-dev libtiff-dev libgif-dev libwebp-dev \
-  libxcomposite-dev libxdamage-dev libxfixes-dev libxss-dev
+  libxcomposite-dev libxdamage-dev libxfixes-dev libxss-dev \
+  mesa-utils libgl1-mesa-dev
 ```
 
 All of the image libraries above are optional at compile time, but installing
@@ -92,12 +93,14 @@ sudo apt install picom
 
 The Picom template lands in `/usr/local/share/WindowMaker/Compositors/picom.conf`.
 After installing, open **WPrefs → Animations & Effects**, pick **Picom** as the
-preferred compositor, enable **window shadows**, and use the **Edit configuration**
-button if you want to extend the shipped blur or shadow settings. Window Maker
-will create the per-user Picom configuration automatically when you select the
-compositor or launch the editor, and the editor button honours `$VISUAL`,
-`$EDITOR`, or falls back to `xdg-open` (installable from `xdg-utils`) so the file
-opens in your system's default text editor.
+preferred compositor, enable **Start compositor automatically** and **window
+shadows** as desired, and use the **Edit configuration** button if you want to
+extend the shipped blur or shadow settings. Window Maker will create the
+per-user Picom configuration automatically when you select the compositor or
+launch the editor, and the editor button honours `$VISUAL`, `$EDITOR`, or falls
+back to `xdg-open` (installable from `xdg-utils`) so the file opens in your
+system's default text editor. The package list above includes Mesa's GLX
+components so the bundled Picom preset can use the `glx` backend immediately.
 
 ## Ubuntu 25.10 (Oracular Oriole)
 
@@ -113,7 +116,8 @@ sudo apt install \
   libxrender-dev libxpm-dev libxmu-dev libsm-dev libice-dev \
   libfreetype6-dev libfontconfig1-dev libxft-dev \
   libpng-dev libjpeg-dev libtiff-dev libgif-dev libwebp-dev \
-  libxcomposite-dev libxdamage-dev libxfixes-dev libxss-dev
+  libxcomposite-dev libxdamage-dev libxfixes-dev libxss-dev \
+  mesa-utils libgl1-mesa-dev
 ```
 
 Ubuntu does not enable `apt build-dep` for upstream Git trees by default, so the
@@ -157,9 +161,11 @@ sudo apt install picom
 ```
 
 After installation, launch WPrefs, switch to **Animations & Effects**, choose the
-Picom entry, and toggle **window shadows** to preview the blended minimize/
-restore paths. The configuration editor in that panel updates the Picom template
-under `~/.config/picom/picom.conf` the first time you open it.
+Picom entry, enable **Start compositor automatically** if you want Window Maker
+to launch Picom on login, and toggle **window shadows** to preview the blended
+minimize/restore paths. The configuration editor in that panel updates the Picom
+template under `~/.config/picom/picom.conf` the first time you open it, and the
+Mesa packages installed earlier provide the GLX backend Picom expects.
 
 ## Verifying the result
 
