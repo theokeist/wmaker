@@ -329,6 +329,7 @@ static void layoutSectionButtons(void)
         int totalButtonWidth;
         int startX;
         int i;
+        int minWidth;
 
         if (!WPrefs.buttonF || !WPrefs.scrollV)
                 return;
@@ -344,12 +345,10 @@ static void layoutSectionButtons(void)
                 totalButtonWidth = buttonWidth * WPrefs.sectionCount;
         } else {
                 buttonWidth = NAV_BUTTON_SIZE;
-                totalButtonWidth = 0;
+                totalButtonWidth = NAV_BUTTON_SIZE;
         }
 
-        contentWidth = availableWidth;
-        if (totalButtonWidth > contentWidth)
-                contentWidth = totalButtonWidth;
+        contentWidth = totalButtonWidth;
         if (contentWidth <= 0)
                 contentWidth = NAV_BUTTON_SIZE;
 
@@ -364,15 +363,9 @@ static void layoutSectionButtons(void)
         }
 
         if (WPrefs.win) {
-                int minWidth = FRAME_WIDTH + (MAIN_WINDOW_SIDE_MARGIN * 2);
-                int navMinWidth = (NAV_BUTTON_SIZE * (WPrefs.sectionCount > 0 ? WPrefs.sectionCount : 1))
-                                  + (MAIN_WINDOW_SIDE_MARGIN * 2);
-                int currentContentMin = contentWidth + (MAIN_WINDOW_SIDE_MARGIN * 2);
-
-                if (navMinWidth > minWidth)
-                        minWidth = navMinWidth;
-                if (currentContentMin > minWidth)
-                        minWidth = currentContentMin;
+                minWidth = FRAME_WIDTH + (MAIN_WINDOW_SIDE_MARGIN * 2);
+                if (minWidth < (NAV_BUTTON_SIZE + (MAIN_WINDOW_SIDE_MARGIN * 2)))
+                        minWidth = NAV_BUTTON_SIZE + (MAIN_WINDOW_SIDE_MARGIN * 2);
 
                 WMSetWindowMinSize(WPrefs.win, minWidth, INITIAL_WINDOW_HEIGHT);
         }
