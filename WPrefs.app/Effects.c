@@ -137,10 +137,10 @@ static void updateConfigPathLabel(_Panel *panel)
 {
         if (!panel->configPath || panel->configPath[0] == '\0') {
                 WMSetLabelText(panel->configPathL, _("No configuration needed"));
-                WMSetWidgetEnabled(panel->openConfigB, False);
+                WMSetButtonEnabled(panel->openConfigB, False);
         } else {
                 WMSetLabelText(panel->configPathL, panel->configPath);
-                WMSetWidgetEnabled(panel->openConfigB, True);
+                WMSetButtonEnabled(panel->openConfigB, True);
         }
 }
 
@@ -272,7 +272,7 @@ static void launch_editor_for_config(_Panel *panel)
 
 static void showData(_Panel *panel)
 {
-        char *str;
+        const char *str;
         int index;
 
         str = GetStringForKey("WindowMovementEffect");
@@ -467,7 +467,7 @@ Panel *InitEffects(WMWidget *parent)
         panel->callbacks.createWidgets = createPanel;
         panel->callbacks.updateDomain = storeData;
         panel->callbacks.undoChanges = undo;
-        panel->callbacks.prepareForClose = (WMCallbackFunction)prepareForClose;
+        panel->callbacks.prepareForClose = prepareForClose;
 
         AddSection((Panel *)panel, ICON_FILE);
 

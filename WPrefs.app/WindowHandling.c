@@ -69,12 +69,6 @@ typedef struct _Panel {
 	WMFrame *dragmaxF;
 	WMPopUpButton *dragmaxP;
 
-	WMFrame *effectsF;
-	WMPopUpButton *moveEffectP;
-	WMPopUpButton *launchEffectP;
-	WMLabel *moveEffectL;
-	WMLabel *launchEffectL;
-	WMButton *showContentB;
 } _Panel;
 
 #define ICON_FILE "whandling"
@@ -253,21 +247,10 @@ static void showData(_Panel * panel)
 	WMSetButtonSelected(panel->miconB, GetBoolForKey("NoWindowOverIcons"));
 	WMSetButtonSelected(panel->mdockB, GetBoolForKey("NoWindowOverDock"));
 
-	str = GetStringForKey("WindowMovementEffect");
-        WMSetPopUpButtonSelectedItem(panel->moveEffectP,
-                                     clamp_transition_effect_index(getTransitionEffect(str)));
-
-	str = GetStringForKey("LaunchEffect");
-	WMSetPopUpButtonSelectedItem(panel->launchEffectP,
-     clamp_transition_effect_index(getTransitionEffect(str)));
-
-	WMSetButtonSelected(panel->showContentB,
-		GetBoolForKey("ShowWindowContentsDuringAnimations"));
-
-	if (GetBoolForKey("Attraction"))
-		WMPerformButtonClick(panel->resrB);
-	else
-		WMPerformButtonClick(panel->resaB);
+        if (GetBoolForKey("Attraction"))
+                WMPerformButtonClick(panel->resrB);
+        else
+                WMPerformButtonClick(panel->resaB);
 }
 
 static void storeData(_Panel * panel)
@@ -293,19 +276,7 @@ static void storeData(_Panel * panel)
 	WMReleasePropList(y);
 	SetObjectForKey(arr, "WindowPlaceOrigin");
 
-	{
-		int move_index = clamp_transition_effect_index(WMGetPopUpButtonSelectedItem(panel->moveEffectP));
-		int launch_index = clamp_transition_effect_index(WMGetPopUpButtonSelectedItem(panel->launchEffectP));
-
-		SetStringForKey(transition_effects[move_index].db_value, "WindowMovementEffect");
-
-		SetStringForKey(transition_effects[launch_index].db_value, "LaunchEffect");
-	}
-
-	SetBoolForKey(WMGetButtonSelected(panel->showContentB),
-		"ShowWindowContentsDuringAnimations");
-
-	SetIntegerForKey(WMGetSliderValue(panel->resS), "EdgeResistance");
+        SetIntegerForKey(WMGetSliderValue(panel->resS), "EdgeResistance");
 
 	SetStringForKey(drag_maximized_window_options[WMGetPopUpButtonSelectedItem(panel->dragmaxP)].db_value,
 			"DragMaximizedWindow");
