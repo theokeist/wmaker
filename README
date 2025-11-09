@@ -75,8 +75,8 @@ Read before asking.
 * doc/BUILDING_ON_DEBIAN_UBUNTU.md walks through installing the build
   dependencies and compiling Window Maker on Debian 12/13 and Ubuntu
   25.10 systems.
-* doc/GLASS_AND_SONOMA_UI_NOTES.md combines the glass UI roadmap
-  with the Sonoma modernization blueprint, detailing wrlib materials,
+* doc/GLASS_AND_MODERN_UI_NOTES.md combines the glass UI roadmap
+  with the Modern UI blueprint, detailing wrlib materials,
   WINGs hooks, and Window Maker touchpoints for rounded, translucent
   themes.
 

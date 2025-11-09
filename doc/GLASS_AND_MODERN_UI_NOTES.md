@@ -1,6 +1,6 @@
-# Glass and Sonoma UI Modernization Guide
+# Glass and Modern UI Modernization Guide
 
-This guide merges the earlier glass/skeuomorphic roadmap and the Sonoma UI blueprint
+This guide merges the earlier glass/skeuomorphic roadmap and the Modern UI blueprint
 into a single reference. It explains how to evolve Window Maker's visuals—from rounded
 menus to vibrant translucent materials—while keeping the codebase lightweight and
 backward compatible. Each section calls out the relevant subsystems (wrlib, WINGs, the
@@ -51,7 +51,7 @@ The following sections map these goals to concrete engineering tasks.
    hover/drag feedback. Consider subtle parallax when scrolling content to reinforce
    depth.
 3. **Defaults schema** – extend `WINGs/WINGsDefaults.c` with keys such as
-   `MenuCornerRadius`, `GlassHighlightOpacity`, `SonomaShadowRadius`, and motion/toggle
+   `MenuCornerRadius`, `GlassHighlightOpacity`, `ModernShadowRadius`, and motion/toggle
    options. Default them to classic values so older themes render unchanged.
 4. **Compositor-aware windows** – when an ARGB visual is active, create widget backing
    windows with the matching colormap and cache ARGB pixmaps for off-screen painting.
@@ -154,7 +154,7 @@ After implementing the modernization work, rebuild and confirm:
 5. **High-DPI** – Retina/HiDPI displays render crisp corners, shadows, and materials
    thanks to the wrlib scaling improvements.
 
-Following this unified guide keeps glass-era skeuomorphism and Sonoma-inspired
+Following this unified guide keeps glass-era skeuomorphism and Modern-inspired
 translucency grounded in reusable infrastructure: wrlib supplies the image primitives
 and materials, WINGs exposes them to applications, the core window manager consumes
 them for chrome and motion, and WPrefs lets users dial in their preferred balance of
