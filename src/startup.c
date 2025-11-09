@@ -976,16 +976,10 @@ static void startConfiguredCompositor(void)
                         snprintf(command, sizeof(command),
                                  "picom --experimental-backends --animations");
                 break;
-        case WCOMPOSITOR_COMPIZ:
-                if (!command_exists("compiz")) {
-                        wwarning(_("Compiz compositor selected but not found in PATH; skipping startup."));
-                        break;
-                }
-
-                snprintf(command, sizeof(command),
-                         "COMPIZ_CONFIG_PROFILE=windowmaker compiz --replace --sm-disable");
-                break;
         default:
+                if (wPreferences.compositor_choice != WCOMPOSITOR_NONE)
+                        wwarning(_("Unknown compositor selection %d; skipping startup."),
+                                 wPreferences.compositor_choice);
                 return;
         }
 

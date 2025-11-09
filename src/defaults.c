@@ -241,10 +241,10 @@ static WOptionEnumeration seTransitionEffects[] = {
 };
 
 static WOptionEnumeration seCompositors[] = {
-	{"None", WCOMPOSITOR_NONE, 0},
-	{"Picom", WCOMPOSITOR_PICOM, 0},
-	{"Compiz", WCOMPOSITOR_COMPIZ, 0},
-	{NULL, 0, 0},
+        {"None", WCOMPOSITOR_NONE, 0},
+        {"Picom", WCOMPOSITOR_PICOM, 0},
+        {"Compiz", WCOMPOSITOR_NONE, 1},
+        {NULL, 0, 0},
 };
 
 static WOptionEnumeration seMouseButtonActions[] = {

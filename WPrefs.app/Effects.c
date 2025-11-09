@@ -67,9 +67,8 @@ static const struct {
         const char *label;
         const char *default_path;
 } compositor_options[] = {
-        { "None",   N_("No compositor (classic look)"), "" },
-        { "Picom",  N_("Picom (lightweight effects)"), "~/.config/picom/picom.conf" },
-        { "Compiz", N_("Compiz (full compositor)"), "~/.config/compiz/config" }
+        { "None",  N_("No compositor (classic look)"), "" },
+        { "Picom", N_("Picom (lightweight effects)"), "~/.config/picom/picom.conf" }
 };
 
 static int clamp_transition_effect_index(int index)
@@ -189,7 +188,7 @@ static int ensure_config_template(int index, const char *path)
         FILE *in, *out;
         int c;
 
-        if (!path || index <= 0)
+        if (!path || index != 1)
                 return -1;
 
         if (stat(path, &st) == 0)
@@ -201,7 +200,7 @@ static int ensure_config_template(int index, const char *path)
                 wmkdirhier(dirpath);
         wfree(dircopy);
 
-        template_name = (index == 2) ? "compiz.conf" : "picom.conf";
+        template_name = "picom.conf";
         snprintf(template_path, sizeof(template_path), "%s/Compositors/%s", WMAKER_RESOURCE_PATH, template_name);
 
         in = fopen(template_path, "r");
@@ -239,7 +238,7 @@ static void launch_editor_for_config(_Panel *panel)
         char command[PATH_MAX * 2];
         pid_t pid;
 
-        if (panel->compositorIndex <= 0 || !panel->configPath)
+        if (panel->compositorIndex != 1 || !panel->configPath)
                 return;
 
         expanded = wexpandpath(panel->configPath);
@@ -295,7 +294,10 @@ static void showData(_Panel *panel)
         str = GetStringForKey("CompositorConfigPath");
         if (!str || !str[0])
                 str = default_path_for_index(index);
-        set_config_path(panel, str);
+        if (index == 1)
+                set_config_path(panel, str);
+        else
+                set_config_path(panel, NULL);
         updateConfigPathLabel(panel);
 }
 
@@ -311,7 +313,7 @@ static void storeData(_Panel *panel)
                       "ShowWindowContentsDuringAnimations");
 
         SetStringForKey(compositor_options[compositor_index].db_value, "PreferredCompositor");
-        if (panel->configPath)
+        if (panel->configPath && panel->compositorIndex == 1)
                 SetStringForKey(panel->configPath, "CompositorConfigPath");
         else
                 RemoveObjectForKey("CompositorConfigPath");
@@ -340,7 +342,10 @@ static void compositorChanged(WMWidget *w, void *data)
 
         if (index != panel->compositorIndex) {
                 default_path = default_path_for_index(index);
-                set_config_path(panel, default_path);
+                if (index == 1)
+                        set_config_path(panel, default_path);
+                else
+                        set_config_path(panel, NULL);
                 panel->compositorIndex = index;
         }
 
@@ -428,8 +433,8 @@ static void createPanel(Panel *p)
         WMMoveWidget(panel->hintL, 180, 80);
         WMSetLabelWraps(panel->hintL, True);
         WMSetLabelText(panel->hintL,
-                       _("Picom is ideal for lightweight translucency, while Compiz unlocks the Glide minimize effect "
-                         "when replacing the window manager."));
+                       _("Picom pairs well with the Glide minimize effect. Window Maker falls back to classic animations "
+                         "if no compositor is active."));
 
         WMRealizeWidget(panel->box);
         WMRealizeWidget(panel->contentB);

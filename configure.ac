@@ -864,39 +864,20 @@ AC_SUBST(HEADER_SEARCH_PATH)
 m4_divert_push([INIT_PREPARE])dnl
 AC_ARG_WITH([compositor],
     [AS_HELP_STRING([--with-compositor=NAME],
-        [select default compositor integration (picom|compiz|none) @<:@picom@:>@])],
+        [select default compositor integration (picom|none) @<:@none@:>@])],
     [with_compositor="$withval"],
-    [with_compositor=picom])
+    [with_compositor=none])
 m4_divert_pop([INIT_PREPARE])dnl
-
-install_picom_config=no
-install_compiz_config=no
 
 AS_CASE([$with_compositor],
     [picom], [wm_compositor_name=Picom
-              wm_compositor_binary=picom
-              wm_compositor_config='~/.config/picom/picom.conf'
-              install_picom_config=yes],
-    [compiz], [wm_compositor_name=Compiz
-               wm_compositor_binary=compiz
-               wm_compositor_config='~/.config/compiz/config'
-               install_compiz_config=yes],
+              wm_compositor_config='~/.config/picom/picom.conf'],
     [none], [wm_compositor_name=None
-             wm_compositor_binary=
              wm_compositor_config=''],
-    [AC_MSG_ERROR([unsupported compositor "$with_compositor" (use picom, compiz, or none)])])
-
-AS_IF([test "x$wm_compositor_binary" != "x"], [
-    AC_PATH_PROG([WM_COMPOSITOR_BIN], [$wm_compositor_binary], [no])
-    AS_IF([test "x$WM_COMPOSITOR_BIN" = "xno"],
-        [AC_MSG_ERROR([$wm_compositor_binary not found in PATH; install it or use --with-compositor=none])])
-])
+    [AC_MSG_ERROR([unsupported compositor "$with_compositor" (use picom or none)])])
 
 AC_SUBST([DEFAULT_COMPOSITOR_NAME], [$wm_compositor_name])
 AC_SUBST([DEFAULT_COMPOSITOR_CONFIG_PATH], [$wm_compositor_config])
-
-AM_CONDITIONAL([INSTALL_PICOM_CONFIG], [test "x$install_picom_config" = "xyes"])
-AM_CONDITIONAL([INSTALL_COMPIZ_CONFIG], [test "x$install_compiz_config" = "xyes"])
 
 
 AC_SUBST(GFXLIBS)

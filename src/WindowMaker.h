@@ -187,8 +187,7 @@ typedef enum {
 
 typedef enum {
         WCOMPOSITOR_NONE = 0,
-        WCOMPOSITOR_PICOM,
-        WCOMPOSITOR_COMPIZ
+        WCOMPOSITOR_PICOM
 } WCompositorChoice;
 
 
