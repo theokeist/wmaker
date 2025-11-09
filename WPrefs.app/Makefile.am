@@ -48,6 +48,7 @@ WPrefs_SOURCES = \
 	TexturePanel.c \
 	TexturePanel.h \
 	WindowHandling.c \
+	Effects.c \
 	Workspace.c \
 	double.c \
 	editmenu.c \

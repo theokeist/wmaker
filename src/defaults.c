@@ -103,6 +103,7 @@ static WDECallbackConvert getColor;
 static WDECallbackConvert getKeybind;
 static WDECallbackConvert getModMask;
 static WDECallbackConvert getPropList;
+static WDECallbackConvert getString;
 
 /* value setting functions */
 static WDECallbackUpdate setJustify;
@@ -237,6 +238,13 @@ static WOptionEnumeration seTransitionEffects[] = {
 	{"Smooth", WMEFFECT_CURVE_SMOOTH, 0},
 	{"Gentle", WMEFFECT_CURVE_GENTLE, 0},
 	{NULL, 0, 0}
+};
+
+static WOptionEnumeration seCompositors[] = {
+	{"None", WCOMPOSITOR_NONE, 0},
+	{"Picom", WCOMPOSITOR_PICOM, 0},
+	{"Compiz", WCOMPOSITOR_COMPIZ, 0},
+	{NULL, 0, 0},
 };
 
 static WOptionEnumeration seMouseButtonActions[] = {
@@ -433,6 +441,10 @@ WDefaultEntry optionList[] = {
 	    &wPreferences.window_movement_effect, getEnum, NULL, NULL, NULL},
 	{"LaunchEffect", "Classic", seTransitionEffects,
 	    &wPreferences.launch_effect, getEnum, NULL, NULL, NULL},
+	{"PreferredCompositor", DEFAULT_COMPOSITOR_NAME, seCompositors,
+	    &wPreferences.compositor_choice, getEnum, NULL, NULL, NULL},
+	{"CompositorConfigPath", DEFAULT_COMPOSITOR_CONFIG_PATH, NULL,
+	    &wPreferences.compositor_config_path, getString, NULL, NULL, NULL},
 	{"ShowWindowContentsDuringAnimations", "NO", NULL,
 	    &wPreferences.show_window_contents_in_animations, getBool, NULL, NULL, NULL},
 	{"ShadeSpeed", "fast", seSpeeds,
@@ -1542,16 +1554,48 @@ static int getCoord(WScreen * scr, WDefaultEntry * entry, WMPropList * value, vo
 
 static int getPropList(WScreen * scr, WDefaultEntry * entry, WMPropList * value, void *addr, void **ret)
 {
-	/* Parameter not used, but tell the compiler that it is ok */
-	(void) scr;
-	(void) entry;
-	(void) addr;
+        /* Parameter not used, but tell the compiler that it is ok */
+        (void) scr;
+        (void) entry;
+        (void) addr;
 
-	WMRetainPropList(value);
+        WMRetainPropList(value);
 
-	*ret = value;
+        *ret = value;
 
-	return True;
+        return True;
+}
+
+static int getString(WScreen *scr, WDefaultEntry *entry, WMPropList *value, void *addr, void **ret)
+{
+        const char *val;
+        char *duplicate;
+
+        /* Parameter not used, but tell the compiler that it is ok */
+        (void)scr;
+
+        GET_STRING_OR_DEFAULT("String", val);
+
+        duplicate = wstrdup(val);
+        if (!duplicate)
+                return False;
+
+        if (addr) {
+                char **target = addr;
+
+                if (*target)
+                        wfree(*target);
+                *target = duplicate;
+
+                if (ret)
+                        *ret = *target;
+        } else if (ret) {
+                *ret = duplicate;
+        } else {
+                wfree(duplicate);
+        }
+
+        return True;
 }
 
 static int getPathList(WScreen * scr, WDefaultEntry * entry, WMPropList * value, void *addr, void **ret)

@@ -152,6 +152,7 @@ void Initialize(WMScreen *scr);
 Panel *InitAppearance(WMWidget *parent);
 Panel *InitConfigurations(WMWidget *parent);
 Panel *InitDocks(WMWidget *parent);
+Panel *InitEffects(WMWidget *parent);
 Panel *InitExpert(WMWidget *parent);
 Panel *InitFocus(WMWidget *parent);
 Panel *InitFontSimple(WMWidget *parent);

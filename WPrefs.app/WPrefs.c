@@ -30,6 +30,9 @@
 
 
 #define MAX_SECTIONS 16
+#define NAV_BUTTON_SIZE 64
+#define MAIN_WINDOW_SIDE_MARGIN 10
+#define INITIAL_WINDOW_HEIGHT 520
 
 typedef struct _WPrefs {
 	WMWindow *win;
@@ -74,6 +77,7 @@ static void savePanelData(Panel * panel);
 static void prepareForClose(void);
 static void updateMainWindowLayout(void);
 static void handleMainWindowResize(void *self, WMNotification *notif);
+static void layoutSectionButtons(void);
 
 static noreturn void quit(WMWidget *w, void *data)
 {
@@ -208,9 +212,9 @@ static void createMainWindow(WMScreen * scr)
         WMScroller *scroller;
         WMFont *font;
         char buffer[128];
-        const int sideMargin = 10;
+        const int sideMargin = MAIN_WINDOW_SIDE_MARGIN;
         const int initialWidth = FRAME_WIDTH + sideMargin * 2;
-        const int initialHeight = 520;
+        const int initialHeight = INITIAL_WINDOW_HEIGHT;
 
         WPrefs.win = WMCreateWindow(scr, "wprefs");
         WMResizeWidget(WPrefs.win, initialWidth, initialHeight);
@@ -311,9 +315,68 @@ static void createMainWindow(WMScreen * scr)
         WMUnmapWidget(WPrefs.saveBtn);
 }
 
+static void layoutSectionButtons(void)
+{
+        int availableWidth;
+        int contentWidth;
+        int buttonWidth;
+        int totalButtonWidth;
+        int startX;
+        int i;
+
+        if (!WPrefs.buttonF || !WPrefs.scrollV)
+                return;
+
+        availableWidth = WMWidgetWidth(WPrefs.scrollV);
+        if (availableWidth <= 0)
+                availableWidth = NAV_BUTTON_SIZE * WPrefs.sectionCount;
+
+        if (WPrefs.sectionCount > 0) {
+                buttonWidth = NAV_BUTTON_SIZE;
+                if (availableWidth > 0) {
+                        int per = (availableWidth + WPrefs.sectionCount - 1) / WPrefs.sectionCount;
+
+                        if (per > buttonWidth)
+                                buttonWidth = per;
+                }
+
+                totalButtonWidth = buttonWidth * WPrefs.sectionCount;
+        } else {
+                buttonWidth = NAV_BUTTON_SIZE;
+                totalButtonWidth = 0;
+        }
+
+        contentWidth = totalButtonWidth;
+        if (availableWidth > contentWidth)
+                contentWidth = availableWidth;
+
+        WMResizeWidget(WPrefs.buttonF, contentWidth, NAV_BUTTON_SIZE);
+
+        if (WPrefs.sectionCount > 0) {
+                startX = (contentWidth - totalButtonWidth) / 2;
+                if (startX < 0)
+                        startX = 0;
+
+                for (i = 0; i < WPrefs.sectionCount; i++) {
+                        WMResizeWidget(WPrefs.sectionB[i], buttonWidth, NAV_BUTTON_SIZE);
+                        WMMoveWidget(WPrefs.sectionB[i], startX + (i * buttonWidth), 0);
+                }
+        }
+
+        if (WPrefs.win) {
+                int minWidth = contentWidth + (MAIN_WINDOW_SIDE_MARGIN * 2);
+                const int baseMinWidth = FRAME_WIDTH + (MAIN_WINDOW_SIDE_MARGIN * 2);
+
+                if (minWidth < baseMinWidth)
+                        minWidth = baseMinWidth;
+
+                WMSetWindowMinSize(WPrefs.win, minWidth, INITIAL_WINDOW_HEIGHT);
+        }
+}
+
 static void updateMainWindowLayout(void)
 {
-        const int sideMargin = 10;
+        const int sideMargin = MAIN_WINDOW_SIDE_MARGIN;
         const int buttonBottomMargin = 12;
         const int buttonSpacing = 10;
         const int buttonHeight = 28;
@@ -372,6 +435,8 @@ static void updateMainWindowLayout(void)
 
         x -= buttonSpacing + WMWidgetWidth(WPrefs.undosBtn);
         WMMoveWidget(WPrefs.undosBtn, x, buttonY);
+
+        layoutSectionButtons();
 }
 
 static void handleMainWindowResize(void *self, WMNotification *notif)
@@ -571,29 +636,29 @@ void SetButtonAlphaImage(WMScreen *scr, WMButton *bPtr, const char *file)
 
 void AddSection(Panel * panel, const char *iconFile)
 {
-	WMButton *bPtr;
+        WMButton *bPtr;
 
-	assert(WPrefs.sectionCount < MAX_SECTIONS);
+        assert(WPrefs.sectionCount < MAX_SECTIONS);
 
-	bPtr = WMCreateCustomButton(WPrefs.buttonF, WBBStateLightMask | WBBStateChangeMask);
-	WMResizeWidget(bPtr, 64, 64);
-	WMMoveWidget(bPtr, WPrefs.sectionCount * 64, 0);
-	WMSetButtonImagePosition(bPtr, WIPImageOnly);
-	WMSetButtonAction(bPtr, changeSection, panel);
-	WMHangData(bPtr, panel);
+        bPtr = WMCreateCustomButton(WPrefs.buttonF, WBBStateLightMask | WBBStateChangeMask);
+        WMResizeWidget(bPtr, NAV_BUTTON_SIZE, NAV_BUTTON_SIZE);
+        WMMoveWidget(bPtr, WPrefs.sectionCount * NAV_BUTTON_SIZE, 0);
+        WMSetButtonImagePosition(bPtr, WIPImageOnly);
+        WMSetButtonAction(bPtr, changeSection, panel);
+        WMHangData(bPtr, panel);
 
-	WMSetBalloonTextForView(((PanelRec *) panel)->description, WMWidgetView(bPtr));
+        WMSetBalloonTextForView(((PanelRec *) panel)->description, WMWidgetView(bPtr));
 	SetButtonAlphaImage(WMWidgetScreen(bPtr), bPtr, iconFile);
 	WMMapWidget(bPtr);
 
 	WPrefs.sectionB[WPrefs.sectionCount] = bPtr;
 
-	if (WPrefs.sectionCount > 0)
-		WMGroupButtons(WPrefs.sectionB[0], bPtr);
+        if (WPrefs.sectionCount > 0)
+                WMGroupButtons(WPrefs.sectionB[0], bPtr);
 
-	WPrefs.sectionCount++;
+        WPrefs.sectionCount++;
 
-	WMResizeWidget(WPrefs.buttonF, WPrefs.sectionCount * 64, 64);
+        layoutSectionButtons();
 }
 
 void Initialize(WMScreen * scr)
@@ -642,11 +707,12 @@ void Initialize(WMScreen * scr)
 
 	WMSetLabelText(WPrefs.statusL, _("Initializing configuration panels..."));
 
-	InitFocus(WPrefs.banner);
-	InitWindowHandling(WPrefs.banner);
+        InitFocus(WPrefs.banner);
+        InitWindowHandling(WPrefs.banner);
+        InitEffects(WPrefs.banner);
 
-	InitMenuPreferences(WPrefs.banner);
-	InitIcons(WPrefs.banner);
+        InitMenuPreferences(WPrefs.banner);
+        InitIcons(WPrefs.banner);
 	InitPreferences(WPrefs.banner);
 
 	InitPaths(WPrefs.banner);

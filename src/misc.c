@@ -727,6 +727,7 @@ char *ExpandOptions(WScreen *scr, const char *cmdline)
                         case 'F':
                         {
                                 const char *payload = NULL;
+                                int anchor = optr;
 #define TRIM_TRAILING_SPACE()                                                      \
         do {                                                                       \
                 while (optr > 0 && (out[optr - 1] == ' ' || out[optr - 1] == '\t')) { \
@@ -760,6 +761,11 @@ char *ExpandOptions(WScreen *scr, const char *cmdline)
                                         optr += slen;
                                 } else {
                                         TRIM_TRAILING_SPACE();
+                                        while (optr > anchor && (out[optr - 1] == '_' || out[optr - 1] == '-' ||
+                                                                 out[optr - 1] == '=' || out[optr - 1] == '.')) {
+                                                optr--;
+                                                out[optr] = '\0';
+                                        }
                                 }
                                 /* macro only used within this scope */
 #undef TRIM_TRAILING_SPACE

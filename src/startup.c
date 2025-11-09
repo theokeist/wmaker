@@ -31,6 +31,7 @@
 #ifdef __FreeBSD__
 #include <sys/signal.h>
 #endif
+#include <limits.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>
@@ -73,6 +74,7 @@
 #endif
 
 #include "xutil.h"
+#include <WINGs/WUtil.h>
 
 /* for SunOS */
 #ifndef SA_RESTART
@@ -89,6 +91,11 @@ static WScreen **wScreen = NULL;
 static unsigned int _NumLockMask = 0;
 static unsigned int _ScrollLockMask = 0;
 static void manageAllWindows(WScreen * scr, int crashed);
+
+static char *quote_argument(const char *path);
+static char *resolve_config_path(const char *path);
+static void startConfiguredCompositor(void);
+static Bool command_exists(const char *binary);
 
 static int catchXError(Display * dpy, XErrorEvent * error)
 {
@@ -708,6 +715,8 @@ void StartUp(Bool defaultScreenOnly)
 		Exit(1);
 	}
 
+	startConfiguredCompositor();
+
 #ifndef HAVE_INOTIFY
 	/* setup defaults file polling */
 	if (!wPreferences.flags.noupdates)
@@ -838,4 +847,153 @@ static void manageAllWindows(WScreen * scr, int crashRecovery)
 	if (!wPreferences.flags.noclip)
 		wDockShowIcons(scr->workspaces[scr->current_workspace]->clip);
 	scr->flags.startup2 = 0;
+}
+
+static char *quote_argument(const char *path)
+{
+        const char *p;
+        size_t len;
+        char *buffer;
+        char *dst;
+
+        if (!path)
+                return NULL;
+
+        len = 2; /* surrounding quotes */
+        for (p = path; *p; p++) {
+                if (*p == '"' || *p == '\')
+                        len += 2;
+                else
+                        len++;
+        }
+
+        buffer = wmalloc(len + 1);
+        dst = buffer;
+        *dst++ = '"';
+        for (p = path; *p; p++) {
+                if (*p == '"' || *p == '\')
+                        *dst++ = '\';
+                *dst++ = *p;
+        }
+        *dst++ = '"';
+        *dst = '\0';
+
+        return buffer;
+}
+
+static char *resolve_config_path(const char *path)
+{
+        char *expanded;
+
+        if (!path || !*path)
+                return NULL;
+
+        expanded = wexpandpath(path);
+        if (!expanded)
+                return NULL;
+
+        if (!*expanded) {
+                wfree(expanded);
+                return NULL;
+        }
+
+        return expanded;
+}
+
+static Bool command_exists(const char *binary)
+{
+        const char *path_env;
+        char *paths;
+        char *token;
+        Bool result = False;
+
+        if (!binary || !*binary)
+                return False;
+
+        if (strchr(binary, '/'))
+                return access(binary, X_OK) == 0;
+
+        path_env = getenv("PATH");
+        if (!path_env || !*path_env)
+                return False;
+
+        paths = wstrdup(path_env);
+        for (token = strtok(paths, ":"); token; token = strtok(NULL, ":")) {
+                const char *dir = (*token) ? token : ".";
+                size_t len = strlen(dir) + strlen(binary) + 2;
+                char *candidate = wmalloc(len);
+
+                snprintf(candidate, len, "%s/%s", dir, binary);
+                if (access(candidate, X_OK) == 0) {
+                        result = True;
+                        wfree(candidate);
+                        break;
+                }
+                wfree(candidate);
+        }
+
+        wfree(paths);
+
+        return result;
+}
+
+static void startConfiguredCompositor(void)
+{
+        char command[PATH_MAX * 2];
+        char *expanded = NULL;
+        char *quoted = NULL;
+
+        command[0] = '\0';
+
+        if (!wScreen || w_global.screen_count == 0)
+                return;
+
+        switch (wPreferences.compositor_choice) {
+        case WCOMPOSITOR_PICOM:
+                if (!command_exists("picom")) {
+                        wwarning(_("Picom compositor selected but not found in PATH; skipping startup."));
+                        break;
+                }
+
+                if (wPreferences.compositor_config_path && wPreferences.compositor_config_path[0])
+                        expanded = resolve_config_path(wPreferences.compositor_config_path);
+                if (expanded && access(expanded, R_OK) != 0) {
+                        int saved = errno;
+
+                        wwarning(_("Picom configuration %s is not accessible (%s); launching with defaults."),
+                                 expanded, strerror(saved));
+                        wfree(expanded);
+                        expanded = NULL;
+                }
+
+                if (expanded)
+                        quoted = quote_argument(expanded);
+                if (quoted)
+                        snprintf(command, sizeof(command),
+                                 "picom --config %s --experimental-backends --animations",
+                                 quoted);
+                else
+                        snprintf(command, sizeof(command),
+                                 "picom --experimental-backends --animations");
+                break;
+        case WCOMPOSITOR_COMPIZ:
+                if (!command_exists("compiz")) {
+                        wwarning(_("Compiz compositor selected but not found in PATH; skipping startup."));
+                        break;
+                }
+
+                snprintf(command, sizeof(command),
+                         "COMPIZ_CONFIG_PROFILE=windowmaker compiz --replace --sm-disable");
+                break;
+        default:
+                return;
+        }
+
+        if (command[0] != '\0')
+                ExecuteShellCommand(wScreen[0], command);
+
+        if (quoted)
+                wfree(quoted);
+        if (expanded)
+                wfree(expanded);
 }

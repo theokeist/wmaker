@@ -90,9 +90,8 @@ typedef struct _Panel {
 #define PLACEMENT_WINDOW_PIXMAP "smallwindow"
 
 #define THUMB_SIZE	16
-#define EFFECTS_FRAME_Y 228
-#define EFFECTS_FRAME_HEIGHT 138
-#define WINDOW_HANDLING_CONTENT_HEIGHT (EFFECTS_FRAME_Y + EFFECTS_FRAME_HEIGHT + 16)
+#define WINDOW_HANDLING_CONTENT_HEIGHT	320
+
 
 static const struct {
 	const char *db_value;
@@ -115,23 +114,6 @@ static const struct {
 	{ "Unmaximize",      N_("...considers the window now unmaximized")   },
 	{ "NoMove",          N_("...does not move the window")               }
 };
-
-static const struct {
-        const char *db_value;
-        const char *label;
-} transition_effects[] = {
-        { "Classic", N_("Classic (legacy acceleration)") },
-        { "Smooth",  N_("Smooth ease-in/out") },
-        { "Gentle",  N_("Gentle smoothstep") }
-};
-
-static inline int clamp_transition_effect_index(int index)
-{
-        if (index < 0 || index >= (int)wlengthof(transition_effects))
-                return 0;
-
-        return index;
-}
 
 static void sliderCallback(WMWidget * w, void *data)
 {
@@ -224,23 +206,6 @@ static int getDragMaximizedWindow(const char *str)
 	wwarning(_("bad option value %s in WindowPlacement. Using default value"), str);
 	return 0;
 }
-
-static int getTransitionEffect(const char *str)
-{
-	int i;
-
-	if (!str)
-		return 0;
-
-	for (i = 0; i < wlengthof(transition_effects); i++) {
-		if (strcasecmp(str, transition_effects[i].db_value) == 0)
-			return i;
-	}
-
-	wwarning(_("bad option value %s in Window animation. Using default value"), str);
-	return 0;
-}
-
 
 static void showData(_Panel * panel)
 {
@@ -660,57 +625,6 @@ static void createPanel(Panel * p)
 
 	WMMapSubwidgets(panel->dragmaxF);
 
-    /**************** Transition Effects ****************/
-        panel->effectsF = WMCreateFrame(panel->contentB);
-	WMResizeWidget(panel->effectsF, 357, EFFECTS_FRAME_HEIGHT);
-	WMMoveWidget(panel->effectsF, 8, EFFECTS_FRAME_Y);
-	WMSetFrameTitle(panel->effectsF, _("Window animations"));
-	WMSetBalloonTextForView(_("Choose easing curves for moves and application launches."),
-				WMWidgetView(panel->effectsF));
-
-	panel->moveEffectL = WMCreateLabel(panel->effectsF);
-	WMResizeWidget(panel->moveEffectL, 150, 20);
-	WMMoveWidget(panel->moveEffectL, 10, 20);
-	WMSetLabelText(panel->moveEffectL, _("Move effect:"));
-
-	panel->moveEffectP = WMCreatePopUpButton(panel->effectsF);
-	WMResizeWidget(panel->moveEffectP, 180, 20);
-	WMMoveWidget(panel->moveEffectP, 160, 20);
-	WMSetBalloonTextForView(_("Applies when windows settle after non-opaque drags or grouped moves."),
-				WMWidgetView(panel->moveEffectP));
-
-	panel->launchEffectL = WMCreateLabel(panel->effectsF);
-	WMResizeWidget(panel->launchEffectL, 150, 20);
-	WMMoveWidget(panel->launchEffectL, 10, 46);
-	WMSetLabelText(panel->launchEffectL, _("Launch effect:"));
-
-	panel->launchEffectP = WMCreatePopUpButton(panel->effectsF);
-	WMResizeWidget(panel->launchEffectP, 180, 20);
-	WMMoveWidget(panel->launchEffectP, 160, 46);
-
-	panel->showContentB = WMCreateSwitchButton(panel->effectsF);
-	WMResizeWidget(panel->showContentB, 330, 40);
-	WMMoveWidget(panel->showContentB, 12, 72);
-	WMSetButtonText(panel->showContentB,
-	_("Show window contents during animations"));
-	WMSetBalloonTextForView(_("Capture the window contents before minimizing and play them\n"
-	"during minimize/maximize animations."),
-	WMWidgetView(panel->showContentB));
-
-        for (i = 0; i < wlengthof(transition_effects); i++)
-                WMAddPopUpButtonItem(panel->moveEffectP, _(transition_effects[i].label));
-        for (i = 0; i < wlengthof(transition_effects); i++)
-                WMAddPopUpButtonItem(panel->launchEffectP, _(transition_effects[i].label));
-
-        WMSetPopUpButtonSelectedItem(panel->moveEffectP, 0);
-        WMSetPopUpButtonSelectedItem(panel->launchEffectP, 0);
-
-	/* The pop-up buttons are plain children (not boxes), so map them explicitly */
-	WMMapWidget(panel->moveEffectP);
-	WMMapWidget(panel->launchEffectP);
-	WMMapWidget(panel->showContentB);
-
-        WMMapSubwidgets(panel->effectsF);
 
         WMRealizeWidget(panel->box);
         WMRealizeWidget(panel->contentB);

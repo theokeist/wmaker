@@ -185,6 +185,12 @@ typedef enum {
 #define WMEFFECT_CURVE_SMOOTH  R_EFFECT_CURVE_SMOOTH
 #define WMEFFECT_CURVE_GENTLE  R_EFFECT_CURVE_GENTLE
 
+typedef enum {
+        WCOMPOSITOR_NONE = 0,
+        WCOMPOSITOR_PICOM,
+        WCOMPOSITOR_COMPIZ
+} WCompositorChoice;
+
 
 /* window states */
 #define WS_FOCUSED	0
@@ -449,6 +455,8 @@ extern struct WPreferences {
         signed char window_movement_effect;
         signed char launch_effect;
         char show_window_contents_in_animations;
+        signed char compositor_choice;
+        char *compositor_config_path;
 
         /* shading animation */
         signed char shade_speed;
