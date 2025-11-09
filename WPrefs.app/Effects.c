@@ -39,19 +39,28 @@ typedef struct _Panel {
         WMBox *contentB;
 
         WMFrame *transitionF;
+        WMLabel *moveEffectL;
         WMPopUpButton *moveEffectP;
+        WMLabel *launchEffectL;
         WMPopUpButton *launchEffectP;
         WMButton *showContentB;
 
         WMFrame *compositorF;
+        WMLabel *compositorL;
         WMPopUpButton *compositorP;
         WMLabel *configPathL;
         WMButton *openConfigB;
         WMLabel *hintL;
+        WMButton *shadowB;
 
         int compositorIndex;
         char *configPath;
 } _Panel;
+
+static void syncShadowToggle(_Panel *panel);
+static void layout_effects_panel(_Panel *panel);
+static void effects_panel_resized(void *self, WMNotification *notif);
+static void showEffectsPanel(Panel *panel);
 
 static const struct {
         const char *db_value;
@@ -133,15 +142,28 @@ static void set_config_path(_Panel *panel, const char *path)
                 panel->configPath = wstrdup(path);
 }
 
+static void syncShadowToggle(_Panel *panel)
+{
+        if (!panel->shadowB)
+                return;
+
+        WMSetButtonEnabled(panel->shadowB, panel->compositorIndex == 1);
+}
+
 static void updateConfigPathLabel(_Panel *panel)
 {
-        if (!panel->configPath || panel->configPath[0] == '\0') {
-                WMSetLabelText(panel->configPathL, _("No configuration needed"));
+        if (panel->compositorIndex != 1 || !panel->configPath || panel->configPath[0] == '\0') {
+                if (panel->compositorIndex == 1)
+                        WMSetLabelText(panel->configPathL, _("Picom configuration will be created on demand"));
+                else
+                        WMSetLabelText(panel->configPathL, _("No compositor configuration in use"));
                 WMSetButtonEnabled(panel->openConfigB, False);
         } else {
                 WMSetLabelText(panel->configPathL, panel->configPath);
                 WMSetButtonEnabled(panel->openConfigB, True);
         }
+
+        syncShadowToggle(panel);
 }
 
 static char *quote_for_shell(const char *path)
@@ -291,6 +313,8 @@ static void showData(_Panel *panel)
         panel->compositorIndex = index;
         WMSetPopUpButtonSelectedItem(panel->compositorP, index);
 
+        WMSetButtonSelected(panel->shadowB, GetBoolForKey("EnableWindowShadows"));
+
         str = GetStringForKey("CompositorConfigPath");
         if (!str || !str[0])
                 str = default_path_for_index(index);
@@ -299,6 +323,8 @@ static void showData(_Panel *panel)
         else
                 set_config_path(panel, NULL);
         updateConfigPathLabel(panel);
+
+        layout_effects_panel(panel);
 }
 
 static void storeData(_Panel *panel)
@@ -317,6 +343,8 @@ static void storeData(_Panel *panel)
                 SetStringForKey(panel->configPath, "CompositorConfigPath");
         else
                 RemoveObjectForKey("CompositorConfigPath");
+
+        SetBoolForKey(WMGetButtonSelected(panel->shadowB), "EnableWindowShadows");
 }
 
 static void undo(_Panel *panel)
@@ -358,6 +386,163 @@ static void openConfig(WMWidget *w, void *data)
         launch_editor_for_config((_Panel *)data);
 }
 
+static void layout_effects_panel(_Panel *panel)
+{
+        const int outerMargin = 8;
+        const int innerMargin = 12;
+        const int rowHeight = 24;
+        const int spacing = 12;
+        int boxWidth;
+        int boxHeight;
+        int scrollWidth;
+        int scrollHeight;
+        int contentWidth;
+        int frameWidth;
+        int controlWidth;
+        int controlX;
+        int labelWidth;
+        int availableWidth;
+        int visibleHeight;
+        int y;
+        int compY;
+        int totalHeight;
+        int toggleWidth;
+        int buttonWidth;
+        int compositorTop;
+
+        if (!panel || !panel->box || !panel->scrollV || !panel->contentB)
+                return;
+
+        boxWidth = WMWidgetWidth(panel->box);
+        boxHeight = WMWidgetHeight(panel->box);
+
+        scrollWidth = boxWidth - (outerMargin * 2);
+        scrollHeight = boxHeight - (outerMargin * 2);
+        if (scrollWidth < 240)
+                scrollWidth = 240;
+        if (scrollHeight < 240)
+                scrollHeight = 240;
+
+        WMResizeWidget(panel->scrollV, scrollWidth, scrollHeight);
+        WMMoveWidget(panel->scrollV, outerMargin, outerMargin);
+
+        contentWidth = scrollWidth - (outerMargin * 2);
+        if (contentWidth < 320)
+                contentWidth = 320;
+
+        frameWidth = contentWidth - (outerMargin * 2);
+        if (frameWidth < 260) {
+                frameWidth = 260;
+                if (contentWidth < frameWidth + (outerMargin * 2))
+                        contentWidth = frameWidth + (outerMargin * 2);
+        }
+
+        controlWidth = frameWidth / 2;
+        if (controlWidth < 220)
+                controlWidth = 220;
+        if (controlWidth > frameWidth - (innerMargin * 2))
+                controlWidth = frameWidth - (innerMargin * 2);
+
+        controlX = frameWidth - controlWidth - innerMargin;
+        labelWidth = controlX - innerMargin;
+        if (labelWidth < 100)
+                labelWidth = 100;
+
+        availableWidth = frameWidth - (innerMargin * 2);
+        if (availableWidth < 120)
+                availableWidth = 120;
+
+        y = innerMargin;
+
+        WMResizeWidget(panel->moveEffectL, labelWidth, rowHeight);
+        WMMoveWidget(panel->moveEffectL, innerMargin, y);
+        WMResizeWidget(panel->moveEffectP, controlWidth, rowHeight);
+        WMMoveWidget(panel->moveEffectP, controlX, y - 2);
+
+        y += rowHeight + spacing;
+
+        WMResizeWidget(panel->launchEffectL, labelWidth, rowHeight);
+        WMMoveWidget(panel->launchEffectL, innerMargin, y);
+        WMResizeWidget(panel->launchEffectP, controlWidth, rowHeight);
+        WMMoveWidget(panel->launchEffectP, controlX, y - 2);
+
+        y += rowHeight + spacing;
+
+        toggleWidth = availableWidth;
+        WMResizeWidget(panel->showContentB, toggleWidth, 28);
+        WMMoveWidget(panel->showContentB, innerMargin, y);
+
+        y += 28 + spacing;
+
+        WMResizeWidget(panel->transitionF, frameWidth, y + innerMargin);
+        WMMoveWidget(panel->transitionF, outerMargin, outerMargin);
+
+        compY = innerMargin;
+
+        WMResizeWidget(panel->compositorL, labelWidth, rowHeight);
+        WMMoveWidget(panel->compositorL, innerMargin, compY);
+        WMResizeWidget(panel->compositorP, controlWidth, rowHeight);
+        WMMoveWidget(panel->compositorP, controlX, compY - 2);
+
+        compY += rowHeight + spacing;
+
+        WMResizeWidget(panel->shadowB, availableWidth, 28);
+        WMMoveWidget(panel->shadowB, innerMargin, compY);
+
+        compY += 28 + spacing;
+
+        WMResizeWidget(panel->configPathL, availableWidth, 48);
+        WMMoveWidget(panel->configPathL, innerMargin, compY);
+
+        compY += 48 + spacing;
+
+        buttonWidth = controlWidth;
+        if (buttonWidth > availableWidth)
+                buttonWidth = availableWidth;
+        WMResizeWidget(panel->openConfigB, buttonWidth, 28);
+        WMMoveWidget(panel->openConfigB, innerMargin, compY);
+
+        compY += 28 + spacing;
+
+        WMResizeWidget(panel->hintL, availableWidth, 60);
+        WMMoveWidget(panel->hintL, innerMargin, compY);
+
+        compY += 60 + innerMargin;
+
+        compositorTop = outerMargin + WMWidgetHeight(panel->transitionF) + spacing;
+        WMMoveWidget(panel->compositorF, outerMargin, compositorTop);
+        WMResizeWidget(panel->compositorF, frameWidth, compY);
+
+        totalHeight = compositorTop + compY + outerMargin;
+        visibleHeight = scrollHeight - (outerMargin * 2);
+        if (visibleHeight < 0)
+                visibleHeight = 0;
+        if (totalHeight < visibleHeight)
+                totalHeight = visibleHeight;
+
+        WMResizeWidget(panel->contentB, contentWidth, totalHeight);
+}
+
+static void effects_panel_resized(void *self, WMNotification *notif)
+{
+        _Panel *panel = (_Panel *)self;
+
+        if (!panel || WMGetNotificationName(notif) != WMViewSizeDidChangeNotification)
+                return;
+
+        if (WMGetNotificationObject(notif) != WMWidgetView(panel->box))
+                return;
+
+        layout_effects_panel(panel);
+}
+
+static void showEffectsPanel(Panel *p)
+{
+        _Panel *panel = (_Panel *)p;
+
+        layout_effects_panel(panel);
+}
+
 static void createPanel(Panel *p)
 {
         _Panel *panel = (_Panel *)p;
@@ -389,9 +574,15 @@ static void createPanel(Panel *p)
         WMMoveWidget(panel->transitionF, 8, 8);
         WMSetFrameTitle(panel->transitionF, _("Window animations"));
 
+        panel->moveEffectL = WMCreateLabel(panel->transitionF);
+        WMSetLabelText(panel->moveEffectL, _("Window movement curve:"));
+
         panel->moveEffectP = WMCreatePopUpButton(panel->transitionF);
         WMResizeWidget(panel->moveEffectP, 210, 20);
         WMMoveWidget(panel->moveEffectP, 150, 20);
+
+        panel->launchEffectL = WMCreateLabel(panel->transitionF);
+        WMSetLabelText(panel->launchEffectL, _("Launch animation curve:"));
 
         panel->launchEffectP = WMCreatePopUpButton(panel->transitionF);
         WMResizeWidget(panel->launchEffectP, 210, 20);
@@ -412,6 +603,9 @@ static void createPanel(Panel *p)
         WMMoveWidget(panel->compositorF, 8, 150);
         WMSetFrameTitle(panel->compositorF, _("Compositor integration"));
 
+        panel->compositorL = WMCreateLabel(panel->compositorF);
+        WMSetLabelText(panel->compositorL, _("Preferred compositor:"));
+
         panel->compositorP = WMCreatePopUpButton(panel->compositorF);
         WMResizeWidget(panel->compositorP, 210, 20);
         WMMoveWidget(panel->compositorP, 150, 20);
@@ -424,6 +618,9 @@ static void createPanel(Panel *p)
         WMMoveWidget(panel->configPathL, 10, 50);
         WMSetLabelWraps(panel->configPathL, True);
 
+        panel->shadowB = WMCreateSwitchButton(panel->compositorF);
+        WMSetButtonText(panel->shadowB, _("Enable window shadows (requires compositor)"));
+
         panel->openConfigB = WMCreateCommandButton(panel->compositorF);
         WMResizeWidget(panel->openConfigB, 160, 26);
         WMMoveWidget(panel->openConfigB, 10, 90);
@@ -435,8 +632,8 @@ static void createPanel(Panel *p)
         WMMoveWidget(panel->hintL, 180, 80);
         WMSetLabelWraps(panel->hintL, True);
         WMSetLabelText(panel->hintL,
-                       _("Picom pairs well with the Glide minimize effect. Window Maker falls back to classic animations "
-                         "if no compositor is active."));
+                       _("Picom pairs well with the Glide minimize effect and provides soft shadows when enabled. "
+                         "Window Maker falls back to classic animations if no compositor is active."));
 
         WMRealizeWidget(panel->box);
         WMRealizeWidget(panel->contentB);
@@ -452,6 +649,11 @@ static void createPanel(Panel *p)
 
         showData(panel);
         updateConfigPathLabel(panel);
+        layout_effects_panel(panel);
+
+        WMAddNotificationObserver(effects_panel_resized, panel,
+                                  WMViewSizeDidChangeNotification,
+                                  WMWidgetView(panel->box));
 }
 
 Panel *InitEffects(WMWidget *parent)
@@ -470,6 +672,7 @@ Panel *InitEffects(WMWidget *parent)
         panel->callbacks.updateDomain = storeData;
         panel->callbacks.undoChanges = undo;
         panel->callbacks.prepareForClose = prepareForClose;
+        panel->callbacks.showPanel = showEffectsPanel;
 
         AddSection((Panel *)panel, ICON_FILE);
 

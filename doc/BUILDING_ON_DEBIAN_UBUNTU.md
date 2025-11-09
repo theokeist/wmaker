@@ -79,6 +79,22 @@ Using `/usr/local` keeps the build separate from Debian's packaged binaries. If
 you want to stage everything under a temporary directory instead, pass
 `--prefix="$PWD/stage"` and later copy the tree where you need it.
 
+### 5. (Optional) Wire in compositor defaults and shadows
+
+Window Maker's modern animations rely on an external compositor. Install Picom
+and ask `configure` to ship Picom defaults so new users see the effects without
+extra tweaking:
+
+```sh
+sudo apt install picom
+./configure --prefix=/usr/local --with-compositor=picom
+```
+
+The Picom template lands in `/usr/local/share/WindowMaker/Compositors/picom.conf`.
+After installing, open **WPrefs → Animations & Effects**, pick **Picom** as the
+preferred compositor, enable **window shadows**, and use the **Edit configuration**
+button if you want to extend the shipped blur or shadow settings.
+
 ## Ubuntu 25.10 (Oracular Oriole)
 
 Ubuntu 25.10 pulls from the same Debian Trixie package set, so the installation
@@ -125,6 +141,21 @@ wmaker.inst
 This refreshes the GNUstep defaults tree under `~/GNUstep/Defaults`. See
 [`doc/RUNNING_WMAKER.md`](RUNNING_WMAKER.md) for more launch and troubleshooting
 advice once the build is installed.
+
+### 4. (Optional) Enable compositor integration
+
+Ubuntu pulls Picom from the universe repository. Install it alongside Window
+Maker so the Animations & Effects panel can start the compositor automatically:
+
+```sh
+sudo apt install picom
+./configure --prefix=/usr/local --with-compositor=picom
+```
+
+After installation, launch WPrefs, switch to **Animations & Effects**, choose the
+Picom entry, and toggle **window shadows** to preview the blended minimize/
+restore paths. The configuration editor in that panel updates the Picom template
+under `~/.config/picom/picom.conf` the first time you open it.
 
 ## Verifying the result
 

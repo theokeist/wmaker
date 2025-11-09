@@ -168,8 +168,8 @@ Panel *InitWindowHandling(WMWidget *parent);
 Panel *InitWorkspace(WMWidget *parent);
 
 
-#define FRAME_TOP	105
-#define FRAME_LEFT	-2
+#define FRAME_TOP	0
+#define FRAME_LEFT	0
 #define FRAME_WIDTH	560
 #define FRAME_HEIGHT    325
 #endif /* WPREFS_H_ */

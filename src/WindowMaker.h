@@ -456,6 +456,7 @@ extern struct WPreferences {
         char show_window_contents_in_animations;
         signed char compositor_choice;
         char *compositor_config_path;
+        char enable_window_shadows;
 
         /* shading animation */
         signed char shade_speed;

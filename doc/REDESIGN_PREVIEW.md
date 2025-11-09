@@ -31,9 +31,10 @@ the freshly built binaries are used.
 5. Switch to **Effects ▸ Animations & Effects** and choose easing curves for
    window moves and application launches; the pop-ups write their selection
    straight to the defaults database for the core to consume. Enable
-   **Show window contents during animations** and pick a compositor (such as
-   Picom) from the same panel to capture snapshots and let the Glide animation
-   fade smoothly when a compositor is running.
+   **Show window contents during animations**, pick **Picom** as the compositor,
+   toggle **Enable window shadows**, and use **Edit configuration** to inspect the
+   Picom template that ships with Window Maker. With Picom active the Glide
+   animation captures live content and fades smoothly while casting soft shadows.
 6. Hop back to **Icons ▸ Iconification Animation** and pick the new
    *Glide* style—paired with the content toggle above it drives the ARGB
    overlay used by the compositor-friendly minimize animation.

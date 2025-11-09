@@ -970,11 +970,13 @@ static void startConfiguredCompositor(void)
                         quoted = quote_argument(expanded);
                 if (quoted)
                         snprintf(command, sizeof(command),
-                                 "picom --config %s --experimental-backends --animations",
-                                 quoted);
+                                 "picom --config %s --experimental-backends --animations%s",
+                                 quoted,
+                                 wPreferences.enable_window_shadows ? " --shadow" : "");
                 else
                         snprintf(command, sizeof(command),
-                                 "picom --experimental-backends --animations");
+                                 "picom --experimental-backends --animations%s",
+                                 wPreferences.enable_window_shadows ? " --shadow" : "");
                 break;
         default:
                 if (wPreferences.compositor_choice != WCOMPOSITOR_NONE)

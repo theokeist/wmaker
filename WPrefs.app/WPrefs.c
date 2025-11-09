@@ -218,6 +218,7 @@ static void createMainWindow(WMScreen * scr)
         WMFont *font;
         char buffer[128];
         const int sideMargin = MAIN_WINDOW_SIDE_MARGIN;
+        const int navHeight = NAV_BUTTON_SIZE + NAV_SCROLL_PADDING;
         const int initialWidth = FRAME_WIDTH + sideMargin * 2;
         const int initialHeight = INITIAL_WINDOW_HEIGHT;
 
@@ -229,8 +230,7 @@ static void createMainWindow(WMScreen * scr)
         WMSetWindowMiniwindowTitle(WPrefs.win, _("Preferences"));
 
         WPrefs.scrollV = WMCreateScrollView(WPrefs.win);
-        WMResizeWidget(WPrefs.scrollV, initialWidth - (sideMargin * 2),
-                       NAV_BUTTON_SIZE + NAV_SCROLL_PADDING);
+        WMResizeWidget(WPrefs.scrollV, initialWidth - (sideMargin * 2), navHeight);
         WMMoveWidget(WPrefs.scrollV, sideMargin, sideMargin);
         WMSetScrollViewRelief(WPrefs.scrollV, WRSunken);
         WMSetScrollViewHasHorizontalScroller(WPrefs.scrollV, True);
@@ -283,7 +283,7 @@ static void createMainWindow(WMScreen * scr)
 	/* banner */
         WPrefs.banner = WMCreateFrame(WPrefs.win);
         WMResizeWidget(WPrefs.banner, FRAME_WIDTH, FRAME_HEIGHT);
-        WMMoveWidget(WPrefs.banner, FRAME_LEFT + sideMargin, FRAME_TOP);
+        WMMoveWidget(WPrefs.banner, sideMargin, sideMargin + navHeight + 10);
 	WMSetFrameRelief(WPrefs.banner, WRFlat);
 
 	font = WMCreateFont(scr, "Lucida Sans,URW Gothic L,Times New Roman,serif"
@@ -338,31 +338,25 @@ static void layoutSectionButtons(void)
                 availableWidth = NAV_BUTTON_SIZE * WPrefs.sectionCount;
 
         if (WPrefs.sectionCount > 0) {
-                buttonWidth = NAV_BUTTON_SIZE;
-                if (availableWidth > 0) {
-                        int per = (availableWidth + WPrefs.sectionCount - 1) / WPrefs.sectionCount;
-
-                        if (per > buttonWidth)
-                                buttonWidth = per;
-                }
-
+                buttonWidth = (availableWidth + WPrefs.sectionCount - 1) / WPrefs.sectionCount;
+                if (buttonWidth < NAV_BUTTON_SIZE)
+                        buttonWidth = NAV_BUTTON_SIZE;
                 totalButtonWidth = buttonWidth * WPrefs.sectionCount;
         } else {
                 buttonWidth = NAV_BUTTON_SIZE;
                 totalButtonWidth = 0;
         }
 
-        contentWidth = totalButtonWidth;
-        if (availableWidth > contentWidth)
-                contentWidth = availableWidth;
+        contentWidth = availableWidth;
+        if (totalButtonWidth > contentWidth)
+                contentWidth = totalButtonWidth;
+        if (contentWidth <= 0)
+                contentWidth = NAV_BUTTON_SIZE;
 
         WMResizeWidget(WPrefs.buttonF, contentWidth, NAV_BUTTON_SIZE);
 
         if (WPrefs.sectionCount > 0) {
-                startX = (contentWidth - totalButtonWidth) / 2;
-                if (startX < 0)
-                        startX = 0;
-
+                startX = 0;
                 for (i = 0; i < WPrefs.sectionCount; i++) {
                         WMResizeWidget(WPrefs.sectionB[i], buttonWidth, NAV_BUTTON_SIZE);
                         WMMoveWidget(WPrefs.sectionB[i], startX + (i * buttonWidth), 0);
@@ -370,11 +364,15 @@ static void layoutSectionButtons(void)
         }
 
         if (WPrefs.win) {
-                int minWidth = contentWidth + (MAIN_WINDOW_SIDE_MARGIN * 2);
-                const int baseMinWidth = FRAME_WIDTH + (MAIN_WINDOW_SIDE_MARGIN * 2);
+                int minWidth = FRAME_WIDTH + (MAIN_WINDOW_SIDE_MARGIN * 2);
+                int navMinWidth = (NAV_BUTTON_SIZE * (WPrefs.sectionCount > 0 ? WPrefs.sectionCount : 1))
+                                  + (MAIN_WINDOW_SIDE_MARGIN * 2);
+                int currentContentMin = contentWidth + (MAIN_WINDOW_SIDE_MARGIN * 2);
 
-                if (minWidth < baseMinWidth)
-                        minWidth = baseMinWidth;
+                if (navMinWidth > minWidth)
+                        minWidth = navMinWidth;
+                if (currentContentMin > minWidth)
+                        minWidth = currentContentMin;
 
                 WMSetWindowMinSize(WPrefs.win, minWidth, INITIAL_WINDOW_HEIGHT);
         }
@@ -448,6 +446,7 @@ static void updateMainWindowLayout(void)
         int height;
         int contentWidth;
         int bannerWidth;
+        int bannerHeight;
         int buttonY;
         int x;
 
@@ -461,6 +460,8 @@ static void updateMainWindowLayout(void)
         if (contentWidth < 0)
                 contentWidth = 0;
 
+        bannerHeight = FRAME_HEIGHT;
+
         {
                 const int navHeight = NAV_BUTTON_SIZE + NAV_SCROLL_PADDING;
 
@@ -468,7 +469,7 @@ static void updateMainWindowLayout(void)
                 WMMoveWidget(WPrefs.scrollV, sideMargin, sideMargin);
         }
 
-        bannerWidth = contentWidth - (FRAME_LEFT * 2);
+        bannerWidth = contentWidth;
         if (bannerWidth < 0)
                 bannerWidth = 0;
 
@@ -476,8 +477,6 @@ static void updateMainWindowLayout(void)
                 const int navHeight = NAV_BUTTON_SIZE + NAV_SCROLL_PADDING;
                 const int contentTop = sideMargin + navHeight + 10;
                 int buttonAreaTop;
-                int bannerHeight;
-
                 buttonAreaTop = height - buttonBottomMargin - buttonHeight;
                 if (buttonAreaTop < contentTop + FRAME_HEIGHT + 10)
                         buttonAreaTop = contentTop + FRAME_HEIGHT + 10;
@@ -486,7 +485,7 @@ static void updateMainWindowLayout(void)
                 if (bannerHeight < FRAME_HEIGHT)
                         bannerHeight = FRAME_HEIGHT;
 
-                WMMoveWidget(WPrefs.banner, FRAME_LEFT + sideMargin, contentTop);
+                WMMoveWidget(WPrefs.banner, sideMargin, contentTop);
                 WMResizeWidget(WPrefs.banner, bannerWidth, bannerHeight);
         }
 
@@ -505,7 +504,7 @@ static void updateMainWindowLayout(void)
         {
                 const int navHeight = NAV_BUTTON_SIZE + NAV_SCROLL_PADDING;
                 const int contentTop = sideMargin + navHeight + 10;
-                const int minButtonY = contentTop + FRAME_HEIGHT + 10;
+                const int minButtonY = contentTop + bannerHeight + 10;
 
                 if (buttonY < minButtonY)
                         buttonY = minButtonY;

@@ -83,8 +83,10 @@ The following sections map these goals to concrete engineering tasks.
 
 1. **Appearance panels** – enhance the Appearance controls and the dedicated
    Animations & Effects panel with sliders for corner radius, shadow depth,
-   material intensity, and motion strength. Store selections using the schema keys
-   defined above so both classic and modern looks stay configurable from WPrefs.
+   material intensity, and motion strength. Surface compositor selection and the
+   new **window shadows** toggle alongside the easing choices so users can enable
+   Picom-backed shadows without leaving WPrefs. Store selections using the schema
+   keys defined above so both classic and modern looks stay configurable from WPrefs.
 2. **Live previews** – reuse the icon preview infrastructure in `WPrefs.app/Icons.c`
    to render miniature panels/menus that demonstrate the active material and easing
    settings. When possible, sample actual wallpaper pixels via the wrlib helpers so
@@ -114,7 +116,9 @@ Window Maker still relies on a separate compositor to blend translucent pixels o
 framebuffer. To make the most of that compositor:
 
 1. **Autostart guidance** – recommend launching a compositor (e.g., `picom`) via
-   `~/GNUstep/Library/WindowMaker/autostart` so it runs alongside Window Maker.
+   `~/GNUstep/Library/WindowMaker/autostart` or by selecting it in the
+   Animations & Effects panel so it runs alongside Window Maker and applies the
+   bundled shadow template.
 2. **Premultiplied surfaces** – ensure wrlib returns buffers flagged as premultiplied
    alpha and offer helpers that upload them to XRender pictures for reuse across
    widgets.
