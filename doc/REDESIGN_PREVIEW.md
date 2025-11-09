@@ -33,8 +33,12 @@ the freshly built binaries are used.
    straight to the defaults database for the core to consume. Enable
    **Show window contents during animations**, pick **Picom** as the compositor,
    toggle **Enable window shadows**, and use **Edit configuration** to inspect the
-   Picom template that ships with Window Maker. With Picom active the Glide
-   animation captures live content and fades smoothly while casting soft shadows.
+   Picom template that ships with Window Maker. WPrefs now creates a per-user
+   Picom configuration as soon as you select the compositor and launches your
+   preferred editor via `$VISUAL`, `$EDITOR`, or `xdg-open`, so the file opens in
+   the tool your desktop already associates with text edits. With Picom active
+   the Glide animation captures live content and fades smoothly while casting
+   soft shadows.
 6. Hop back to **Icons ▸ Iconification Animation** and pick the new
    *Glide* style—paired with the content toggle above it drives the ARGB
    overlay used by the compositor-friendly minimize animation.

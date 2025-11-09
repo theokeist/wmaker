@@ -234,9 +234,10 @@ static void createMainWindow(WMScreen * scr)
         WMMoveWidget(WPrefs.scrollV, sideMargin, sideMargin);
         WMSetScrollViewRelief(WPrefs.scrollV, WRSunken);
         WMSetScrollViewHasHorizontalScroller(WPrefs.scrollV, True);
-        WMSetScrollViewHasVerticalScroller(WPrefs.scrollV, True);
-	scroller = WMGetScrollViewHorizontalScroller(WPrefs.scrollV);
-	WMSetScrollerArrowsPosition(scroller, WSANone);
+        WMSetScrollViewHasVerticalScroller(WPrefs.scrollV, False);
+        scroller = WMGetScrollViewHorizontalScroller(WPrefs.scrollV);
+        if (scroller)
+                WMSetScrollerArrowsPosition(scroller, WSANone);
 
 	WPrefs.buttonF = WMCreateFrame(WPrefs.win);
 	WMSetFrameRelief(WPrefs.buttonF, WRFlat);
@@ -330,6 +331,7 @@ static void layoutSectionButtons(void)
         int startX;
         int i;
         int minWidth;
+        Bool needsScroll;
 
         if (!WPrefs.buttonF || !WPrefs.scrollV)
                 return;
@@ -360,6 +362,14 @@ static void layoutSectionButtons(void)
                         WMResizeWidget(WPrefs.sectionB[i], buttonWidth, NAV_BUTTON_SIZE);
                         WMMoveWidget(WPrefs.sectionB[i], startX + (i * buttonWidth), 0);
                 }
+        }
+
+        needsScroll = totalButtonWidth > availableWidth;
+        WMSetScrollViewHasHorizontalScroller(WPrefs.scrollV, needsScroll);
+        if (needsScroll) {
+                WMScroller *scroller = WMGetScrollViewHorizontalScroller(WPrefs.scrollV);
+                if (scroller)
+                        WMSetScrollerArrowsPosition(scroller, WSANone);
         }
 
         if (WPrefs.win) {

@@ -27,11 +27,13 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #ifdef __FreeBSD__
 #include <sys/signal.h>
 #endif
 #include <limits.h>
+#include <libgen.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>
@@ -96,6 +98,7 @@ static char *quote_argument(const char *path);
 static char *resolve_config_path(const char *path);
 static void startConfiguredCompositor(void);
 static Bool command_exists(const char *binary);
+static Bool ensure_picom_config(const char *path);
 
 static int catchXError(Display * dpy, XErrorEvent * error)
 {
@@ -937,6 +940,65 @@ static Bool command_exists(const char *binary)
         return result;
 }
 
+static Bool ensure_picom_config(const char *path)
+{
+        struct stat st;
+        char template_path[PATH_MAX];
+        const char *template_name = "picom.conf";
+        FILE *in;
+        FILE *out;
+        char *dircopy;
+        int ch;
+
+        if (!path || !*path)
+                return False;
+
+        if (stat(path, &st) == 0)
+                return True;
+
+        dircopy = wstrdup(path);
+        if (dircopy) {
+                char *dirpath = dirname(dircopy);
+
+                if (dirpath && *dirpath)
+                        wmkdirhier(dirpath);
+                wfree(dircopy);
+        }
+
+        snprintf(template_path, sizeof(template_path), "%s/Compositors/%s", WMAKER_RESOURCE_PATH, template_name);
+
+        in = fopen(template_path, "r");
+        if (!in) {
+                int saved = errno;
+
+                out = fopen(path, "w");
+                if (!out) {
+                        wwarning(_("could not create %s: %s"), path, strerror(saved));
+                        return False;
+                }
+
+                fprintf(out, "# Window Maker compositor configuration placeholder\n");
+                fclose(out);
+                return True;
+        }
+
+        out = fopen(path, "w");
+        if (!out) {
+                int saved = errno;
+
+                fclose(in);
+                wwarning(_("could not write %s: %s"), path, strerror(saved));
+                return False;
+        }
+
+        while ((ch = fgetc(in)) != EOF)
+                fputc(ch, out);
+
+        fclose(in);
+        fclose(out);
+        return True;
+}
+
 static void startConfiguredCompositor(void)
 {
         char command[PATH_MAX * 2];
@@ -957,25 +1019,32 @@ static void startConfiguredCompositor(void)
 
                 if (wPreferences.compositor_config_path && wPreferences.compositor_config_path[0])
                         expanded = resolve_config_path(wPreferences.compositor_config_path);
-                if (expanded && access(expanded, R_OK) != 0) {
-                        int saved = errno;
+                if (expanded) {
+                        if (!ensure_picom_config(expanded)) {
+                                wwarning(_("Picom configuration %s could not be prepared; launching with defaults."),
+                                         expanded);
+                                wfree(expanded);
+                                expanded = NULL;
+                        } else if (access(expanded, R_OK) != 0) {
+                                int saved = errno;
 
-                        wwarning(_("Picom configuration %s is not accessible (%s); launching with defaults."),
-                                 expanded, strerror(saved));
-                        wfree(expanded);
-                        expanded = NULL;
+                                wwarning(_("Picom configuration %s is not accessible (%s); launching with defaults."),
+                                         expanded, strerror(saved));
+                                wfree(expanded);
+                                expanded = NULL;
+                        }
                 }
 
                 if (expanded)
                         quoted = quote_argument(expanded);
                 if (quoted)
                         snprintf(command, sizeof(command),
-                                 "picom --config %s --experimental-backends --animations%s",
+                                 "picom --backend glx --config %s --experimental-backends --animations%s",
                                  quoted,
                                  wPreferences.enable_window_shadows ? " --shadow" : "");
                 else
                         snprintf(command, sizeof(command),
-                                 "picom --experimental-backends --animations%s",
+                                 "picom --backend glx --experimental-backends --animations%s",
                                  wPreferences.enable_window_shadows ? " --shadow" : "");
                 break;
         default:

@@ -93,7 +93,11 @@ sudo apt install picom
 The Picom template lands in `/usr/local/share/WindowMaker/Compositors/picom.conf`.
 After installing, open **WPrefs → Animations & Effects**, pick **Picom** as the
 preferred compositor, enable **window shadows**, and use the **Edit configuration**
-button if you want to extend the shipped blur or shadow settings.
+button if you want to extend the shipped blur or shadow settings. Window Maker
+will create the per-user Picom configuration automatically when you select the
+compositor or launch the editor, and the editor button honours `$VISUAL`,
+`$EDITOR`, or falls back to `xdg-open` (installable from `xdg-utils`) so the file
+opens in your system's default text editor.
 
 ## Ubuntu 25.10 (Oracular Oriole)
 

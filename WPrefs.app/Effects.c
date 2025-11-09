@@ -80,6 +80,43 @@ static const struct {
         { "Picom", N_("Picom (lightweight effects)"), "~/.config/picom/picom.conf" }
 };
 
+static Bool command_exists(const char *binary)
+{
+        const char *path_env;
+        char *paths;
+        char *token;
+        Bool result = False;
+
+        if (!binary || !*binary)
+                return False;
+
+        if (strchr(binary, '/'))
+                return access(binary, X_OK) == 0;
+
+        path_env = getenv("PATH");
+        if (!path_env || !*path_env)
+                return False;
+
+        paths = wstrdup(path_env);
+        for (token = strtok(paths, ":"); token; token = strtok(NULL, ":")) {
+                const char *dir = (*token) ? token : ".";
+                size_t len = strlen(dir) + strlen(binary) + 2;
+                char *candidate = wmalloc(len);
+
+                snprintf(candidate, len, "%s/%s", dir, binary);
+                if (access(candidate, X_OK) == 0) {
+                        result = True;
+                        wfree(candidate);
+                        break;
+                }
+                wfree(candidate);
+        }
+
+        wfree(paths);
+
+        return result;
+}
+
 static int clamp_transition_effect_index(int index)
 {
         if (index < 0 || index >= (int)wlengthof(transition_effects))
@@ -252,6 +289,21 @@ static int ensure_config_template(int index, const char *path)
         return 0;
 }
 
+static void ensure_template_for_selection(_Panel *panel)
+{
+        char *expanded;
+
+        if (!panel || panel->compositorIndex != 1 || !panel->configPath)
+                return;
+
+        expanded = wexpandpath(panel->configPath);
+        if (!expanded)
+                return;
+
+        ensure_config_template(panel->compositorIndex, expanded);
+        wfree(expanded);
+}
+
 static void launch_editor_for_config(_Panel *panel)
 {
         char *expanded;
@@ -276,8 +328,18 @@ static void launch_editor_for_config(_Panel *panel)
         editor = getenv("VISUAL");
         if (!editor || !editor[0])
                 editor = getenv("EDITOR");
-        if (!editor || !editor[0])
-                editor = "xterm -e vi";
+#ifdef __APPLE__
+        if ((!editor || !editor[0]) && command_exists("open"))
+                editor = "open -e";
+#endif
+        if (!editor || !editor[0]) {
+                if (command_exists("xdg-open"))
+                        editor = "xdg-open";
+                else if (command_exists("sensible-editor"))
+                        editor = "sensible-editor";
+                else
+                        editor = "xterm -e vi";
+        }
 
         snprintf(command, sizeof(command), "%s %s", editor, quoted ? quoted : expanded);
 
@@ -323,6 +385,8 @@ static void showData(_Panel *panel)
         else
                 set_config_path(panel, NULL);
         updateConfigPathLabel(panel);
+
+        ensure_template_for_selection(panel);
 
         layout_effects_panel(panel);
 }
@@ -377,6 +441,7 @@ static void compositorChanged(WMWidget *w, void *data)
                 panel->compositorIndex = index;
         }
 
+        ensure_template_for_selection(panel);
         updateConfigPathLabel(panel);
 }
 

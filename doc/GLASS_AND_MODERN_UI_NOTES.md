@@ -118,13 +118,19 @@ framebuffer. To make the most of that compositor:
 1. **Autostart guidance** – recommend launching a compositor (e.g., `picom`) via
    `~/GNUstep/Library/WindowMaker/autostart` or by selecting it in the
    Animations & Effects panel so it runs alongside Window Maker and applies the
-   bundled shadow template.
-2. **Premultiplied surfaces** – ensure wrlib returns buffers flagged as premultiplied
+   bundled shadow template. The core now prepares the Picom configuration file on
+   startup and launches Picom with the GLX backend and the packaged defaults, so
+   users see shadows and animations immediately.
+2. **Editor hand-off** – ensure documentation calls out that WPrefs opens the Picom
+   configuration with the user's preferred editor (`$VISUAL`, `$EDITOR`, or
+   `xdg-open`). This keeps compositor tweaking aligned with the desktop's default
+   tooling.
+3. **Premultiplied surfaces** – ensure wrlib returns buffers flagged as premultiplied
    alpha and offer helpers that upload them to XRender pictures for reuse across
    widgets.
-3. **Fallback detection** – if no compositor is present, skip translucency and render
+4. **Fallback detection** – if no compositor is present, skip translucency and render
    using the existing opaque theme path to avoid visual glitches.
-4. **Glide animations** – the new *Glide* iconification style drives an ARGB overlay
+5. **Glide animations** – the new *Glide* iconification style drives an ARGB overlay
    window with `_NET_WM_WINDOW_OPACITY`, letting compositors fade snapshots smoothly
    during minimize/restore. Without a compositor the fallback outline path keeps
    animations responsive without translucency.
