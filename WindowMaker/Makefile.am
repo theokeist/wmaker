@@ -92,3 +92,9 @@ CLEANFILES = $(GENERATED_MENUS)
 $(GENERATED_MENUS):
 	$(AM_V_GEN)sed -e "s:#wprefs#:$(wpexecbindir)/WPrefs:" \
 		-e "s:#wmdatadir#:$(pkgdatadir):" $(srcdir)/$@.in > $@
+
+installcheck-local:
+	@test -f "$(DESTDIR)$(compositordir)/picom.conf" || { \
+		echo "installcheck: missing $(compositordir)/picom.conf" >&2; \
+		exit 1; \
+	}

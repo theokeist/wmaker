@@ -341,9 +341,7 @@ static void layoutSectionButtons(void)
                 availableWidth = NAV_BUTTON_SIZE * WPrefs.sectionCount;
 
         if (WPrefs.sectionCount > 0) {
-                buttonWidth = (availableWidth + WPrefs.sectionCount - 1) / WPrefs.sectionCount;
-                if (buttonWidth < NAV_BUTTON_SIZE)
-                        buttonWidth = NAV_BUTTON_SIZE;
+                buttonWidth = NAV_BUTTON_SIZE;
                 totalButtonWidth = buttonWidth * WPrefs.sectionCount;
         } else {
                 buttonWidth = NAV_BUTTON_SIZE;
@@ -351,13 +349,15 @@ static void layoutSectionButtons(void)
         }
 
         contentWidth = totalButtonWidth;
-        if (contentWidth <= 0)
-                contentWidth = NAV_BUTTON_SIZE;
+        if (contentWidth < availableWidth)
+                contentWidth = availableWidth;
 
         WMResizeWidget(WPrefs.buttonF, contentWidth, NAV_BUTTON_SIZE);
 
         if (WPrefs.sectionCount > 0) {
-                startX = 0;
+                startX = (contentWidth - totalButtonWidth) / 2;
+                if (startX < 0)
+                        startX = 0;
                 for (i = 0; i < WPrefs.sectionCount; i++) {
                         WMResizeWidget(WPrefs.sectionB[i], buttonWidth, NAV_BUTTON_SIZE);
                         WMMoveWidget(WPrefs.sectionB[i], startX + (i * buttonWidth), 0);

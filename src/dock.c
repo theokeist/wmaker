@@ -3298,20 +3298,22 @@ void wDockTrackWindowLaunch(WDock *dock, Window window)
 				dockIconPaint(icon);
 
 				aicon = wAppIconCreateForDock(dock->screen_ptr, NULL,
-							      wm_instance, wm_class, TILE_NORMAL);
-				/* XXX: can: aicon->icon == NULL ? */
-				PlaceIcon(dock->screen_ptr, &x0, &y0, wGetHeadForWindow(aicon->icon->owner));
-				wAppIconMove(aicon, x0, y0);
-				/* Should this always be lowered? -Dan */
-				if (dock->lowered)
-					wLowerFrame(aicon->icon->core);
-				XMapWindow(dpy, aicon->icon->core->window);
-				aicon->launching = 1;
-				wAppIconPaint(aicon);
-				slide_window_with_curve(aicon->icon->core->window, x0, y0, icon->x_pos, icon->y_pos,
-				                        wPreferences.launch_effect);
-				XUnmapWindow(dpy, aicon->icon->core->window);
-				wAppIconDestroy(aicon);
+					      wm_instance, wm_class, TILE_NORMAL);
+				if (aicon && aicon->icon && aicon->icon->core) {
+					PlaceIcon(dock->screen_ptr, &x0, &y0, wGetHeadForWindow(aicon->icon->owner));
+					wAppIconMove(aicon, x0, y0);
+					/* Should this always be lowered? -Dan */
+					if (dock->lowered)
+						wLowerFrame(aicon->icon->core);
+					XMapWindow(dpy, aicon->icon->core->window);
+					aicon->launching = 1;
+					wAppIconPaint(aicon);
+					slide_window_with_curve(aicon->icon->core->window, x0, y0, icon->x_pos, icon->y_pos,
+						wPreferences.launch_effect);
+					XUnmapWindow(dpy, aicon->icon->core->window);
+				}
+				if (aicon)
+					wAppIconDestroy(aicon);
 			}
 			wDockFinishLaunch(icon);
 			break;
