@@ -103,6 +103,7 @@ static WDECallbackConvert getColor;
 static WDECallbackConvert getKeybind;
 static WDECallbackConvert getModMask;
 static WDECallbackConvert getPropList;
+static WDECallbackConvert getString;
 
 /* value setting functions */
 static WDECallbackUpdate setJustify;
@@ -156,6 +157,7 @@ static WDECallbackUpdate setHotCornerActions;
 static WDECallbackConvert getCursor;
 static WDECallbackUpdate setCursor;
 static WDECallbackUpdate updateDock;
+static WDECallbackUpdate updateDockOpacity;
 
 /*
  * Tables to convert strings to enumeration values.
@@ -232,6 +234,20 @@ static WOptionEnumeration seSpeeds[] = {
 	{NULL, 0, 0}
 };
 
+static WOptionEnumeration seTransitionEffects[] = {
+	{"Classic", WMEFFECT_CURVE_CLASSIC, 0},
+	{"Smooth", WMEFFECT_CURVE_SMOOTH, 0},
+	{"Gentle", WMEFFECT_CURVE_GENTLE, 0},
+	{NULL, 0, 0}
+};
+
+static WOptionEnumeration seCompositors[] = {
+        {"None", WCOMPOSITOR_NONE, 0},
+        {"Picom", WCOMPOSITOR_PICOM, 0},
+        {"Compiz", WCOMPOSITOR_NONE, 1},
+        {NULL, 0, 0},
+};
+
 static WOptionEnumeration seMouseButtonActions[] = {
 	{"None", WA_NONE, 0},
 	{"SelectWindows", WA_SELECT_WINDOWS, 0},
@@ -252,12 +268,13 @@ static WOptionEnumeration seMouseWheelActions[] = {
 };
 
 static WOptionEnumeration seIconificationStyles[] = {
-	{"Zoom", WIS_ZOOM, 0},
-	{"Twist", WIS_TWIST, 0},
-	{"Flip", WIS_FLIP, 0},
-	{"None", WIS_NONE, 0},
-	{"random", WIS_RANDOM, 0},
-	{NULL, 0, 0}
+        {"Zoom", WIS_ZOOM, 0},
+        {"Twist", WIS_TWIST, 0},
+        {"Flip", WIS_FLIP, 0},
+        {"Glide", WIS_GLIDE, 0},
+        {"None", WIS_NONE, 0},
+        {"random", WIS_RANDOM, 0},
+        {NULL, 0, 0}
 };
 
 static WOptionEnumeration seJustifications[] = {
@@ -421,6 +438,22 @@ WDefaultEntry optionList[] = {
 	    &wPreferences.menu_scroll_speed, getEnum, NULL, NULL, NULL},
 	{"IconSlideSpeed", "fast", seSpeeds,
 	    &wPreferences.icon_slide_speed, getEnum, NULL, NULL, NULL},
+	{"WindowMovementEffect", "Classic", seTransitionEffects,
+	    &wPreferences.window_movement_effect, getEnum, NULL, NULL, NULL},
+	{"LaunchEffect", "Classic", seTransitionEffects,
+	    &wPreferences.launch_effect, getEnum, NULL, NULL, NULL},
+	{"PreferredCompositor", DEFAULT_COMPOSITOR_NAME, seCompositors,
+	    &wPreferences.compositor_choice, getEnum, NULL, NULL, NULL},
+        {"CompositorConfigPath", DEFAULT_COMPOSITOR_CONFIG_PATH, NULL,
+            &wPreferences.compositor_config_path, getString, NULL, NULL, NULL},
+        {"EnableWindowShadows", "YES", NULL,
+            &wPreferences.enable_window_shadows, getBool, NULL, NULL, NULL},
+        {"AutostartCompositor", "YES", NULL,
+            &wPreferences.autostart_compositor, getBool, NULL, NULL, NULL},
+        {"DockOpacity", "100", NULL,
+            &wPreferences.dock_opacity, getInt, updateDockOpacity, NULL, NULL},
+        {"ShowWindowContentsDuringAnimations", "NO", NULL,
+            &wPreferences.show_window_contents_in_animations, getBool, NULL, NULL, NULL},
 	{"ShadeSpeed", "fast", seSpeeds,
 	    &wPreferences.shade_speed, getEnum, NULL, NULL, NULL},
 	{"BounceAppIconsWhenUrgent", "YES", NULL,
@@ -1528,16 +1561,48 @@ static int getCoord(WScreen * scr, WDefaultEntry * entry, WMPropList * value, vo
 
 static int getPropList(WScreen * scr, WDefaultEntry * entry, WMPropList * value, void *addr, void **ret)
 {
-	/* Parameter not used, but tell the compiler that it is ok */
-	(void) scr;
-	(void) entry;
-	(void) addr;
+        /* Parameter not used, but tell the compiler that it is ok */
+        (void) scr;
+        (void) entry;
+        (void) addr;
 
-	WMRetainPropList(value);
+        WMRetainPropList(value);
 
-	*ret = value;
+        *ret = value;
 
-	return True;
+        return True;
+}
+
+static int getString(WScreen *scr, WDefaultEntry *entry, WMPropList *value, void *addr, void **ret)
+{
+        const char *val;
+        char *duplicate;
+
+        /* Parameter not used, but tell the compiler that it is ok */
+        (void)scr;
+
+        GET_STRING_OR_DEFAULT("String", val);
+
+        duplicate = wstrdup(val);
+        if (!duplicate)
+                return False;
+
+        if (addr) {
+                char **target = addr;
+
+                if (*target)
+                        wfree(*target);
+                *target = duplicate;
+
+                if (ret)
+                        *ret = *target;
+        } else if (ret) {
+                *ret = duplicate;
+        } else {
+                wfree(duplicate);
+        }
+
+        return True;
 }
 
 static int getPathList(WScreen * scr, WDefaultEntry * entry, WMPropList * value, void *addr, void **ret)
@@ -3554,6 +3619,19 @@ static int updateDock(WScreen * scr, WDefaultEntry * entry,
 
 	if (scr->dock)
 		wDockSwap(scr->dock);
+
+	return 0;
+}
+
+static int updateDockOpacity(WScreen *scr, WDefaultEntry *entry,
+			     void *tdata, void *extra_data)
+{
+	(void) entry;
+	(void) tdata;
+	(void) extra_data;
+
+	if (scr)
+		wDockApplyOpacity(scr);
 
 	return 0;
 }

@@ -2,6 +2,8 @@ SUBDIRS = po
 
 AUTOMAKE_OPTIONS =
 
+AM_LDFLAGS = $(WMAKER_RUNPATH_FLAGS)
+
 pkgdatadir  = $(datadir)/@PACKAGE@
 
 bin_PROGRAMS = wxcopy wxpaste wdwrite wdread getstyle setstyle convertfonts \

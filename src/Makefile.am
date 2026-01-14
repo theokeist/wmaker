@@ -1,5 +1,7 @@
 AUTOMAKE_OPTIONS =
 
+AM_LDFLAGS = $(WMAKER_RUNPATH_FLAGS)
+
 BUILT_SOURCES = wconfig.h
 
 bin_PROGRAMS = wmaker
@@ -151,9 +153,10 @@ endif
 AM_CFLAGS = @PANGO_CFLAGS@
 
 AM_CPPFLAGS = $(DFLAGS) \
-	-I$(top_builddir)/wrlib \
-	-I$(top_srcdir)/WINGs -I$(top_builddir)/WINGs \
-	@HEADER_SEARCH_PATH@
+        -DWMAKER_RESOURCE_PATH=\"$(pkgdatadir)\" \
+        -I$(top_builddir)/wrlib \
+        -I$(top_srcdir)/WINGs -I$(top_builddir)/WINGs \
+        @HEADER_SEARCH_PATH@
 
 
 wmaker_LDADD = \

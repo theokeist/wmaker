@@ -2,6 +2,8 @@
 
 AUTOMAKE_OPTIONS = no-dependencies
 
+AM_LDFLAGS = $(WMAKER_RUNPATH_FLAGS)
+
 EXTRA_DIST = notest.c
 
 noinst_PROGRAMS = wtest

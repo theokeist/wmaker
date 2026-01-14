@@ -200,9 +200,10 @@ static void createPanel(Panel *p)
 	sv = WMCreateScrollView(panel->box);
 	WMResizeWidget(sv, 500, 215);
 	WMMoveWidget(sv, 12, 10);
+	WMSetViewExpandsToParent(WMWidgetView(sv), 12, 10, 12, 10);
 	WMSetScrollViewRelief(sv, WRSunken);
 	WMSetScrollViewHasVerticalScroller(sv, True);
-	WMSetScrollViewHasHorizontalScroller(sv, False);
+	WMSetScrollViewHasHorizontalScroller(sv, True);
 
 	f = WMCreateFrame(panel->box);
 	WMResizeWidget(f, 495, wlengthof(expert_options) * 25 + 8);

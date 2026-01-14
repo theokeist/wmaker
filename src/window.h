@@ -292,6 +292,7 @@ typedef struct WWindow {
 	int icon_x, icon_y;			/* position of the icon */
 	int icon_w, icon_h;
 	RImage *net_icon_image;			/* Window Image */
+	RImage *animation_snapshot;	/* Cached content for animations */
 	Atom type;
 } WWindow;
 
