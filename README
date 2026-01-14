@@ -75,6 +75,8 @@ Read before asking.
 * doc/BUILDING_ON_DEBIAN_UBUNTU.md walks through installing the build
   dependencies and compiling Window Maker on Debian 12/13 and Ubuntu
   25.10 systems.
+* doc/BUILDING_ON_PCLINUXOS_ALT.md covers dependency and build steps for
+  PCLinuxOS and ALT Linux.
 * doc/GLASS_AND_MODERN_UI_NOTES.md combines the glass UI roadmap
   with the Modern UI blueprint, detailing wrlib materials,
   WINGs hooks, and Window Maker touchpoints for rounded, translucent
@@ -323,4 +325,3 @@ be found in po/README and Window Maker/README
 
 If you have any comments, fixes and bug reports (filled BUGFORMs) send them
 to wmaker-dev@googlegroups.com
-
