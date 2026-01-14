@@ -458,6 +458,7 @@ extern struct WPreferences {
         char *compositor_config_path;
         char enable_window_shadows;
         char autostart_compositor;
+        int dock_opacity;              /* opacity of dock icons [0..100] */
 
         /* shading animation */
         signed char shade_speed;

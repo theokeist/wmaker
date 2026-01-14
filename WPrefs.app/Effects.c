@@ -53,6 +53,9 @@ typedef struct _Panel {
         WMLabel *hintL;
         WMButton *shadowB;
         WMButton *autostartB;
+        WMLabel *dockOpacityL;
+        WMSlider *dockOpacityS;
+        WMLabel *dockOpacityValueL;
 
         int compositorIndex;
         char *configPath;
@@ -62,6 +65,7 @@ static void syncCompositorControls(_Panel *panel);
 static void layout_effects_panel(_Panel *panel);
 static void effects_panel_resized(void *self, WMNotification *notif);
 static void showEffectsPanel(Panel *panel);
+static void dockOpacityChanged(WMWidget *w, void *data);
 
 static const struct {
         const char *db_value;
@@ -206,6 +210,19 @@ static void updateConfigPathLabel(_Panel *panel)
 
         WMSetButtonEnabled(panel->openConfigB, hasConfig);
         syncCompositorControls(panel);
+}
+
+static void updateDockOpacityLabel(_Panel *panel)
+{
+        char buffer[16];
+        int value;
+
+        if (!panel || !panel->dockOpacityS || !panel->dockOpacityValueL)
+                return;
+
+        value = WMGetSliderValue(panel->dockOpacityS);
+        snprintf(buffer, sizeof(buffer), "%d%%", value);
+        WMSetLabelText(panel->dockOpacityValueL, buffer);
 }
 
 static char *quote_for_shell(const char *path)
@@ -363,6 +380,7 @@ static void showData(_Panel *panel)
 {
         const char *str;
         int index;
+        int opacity;
 
         str = GetStringForKey("WindowMovementEffect");
         WMSetPopUpButtonSelectedItem(panel->moveEffectP,
@@ -382,6 +400,14 @@ static void showData(_Panel *panel)
 
         WMSetButtonSelected(panel->autostartB, GetBoolForKey("AutostartCompositor"));
         WMSetButtonSelected(panel->shadowB, GetBoolForKey("EnableWindowShadows"));
+
+        opacity = GetIntegerForKey("DockOpacity");
+        if (opacity < 0)
+                opacity = 0;
+        if (opacity > 100)
+                opacity = 100;
+        WMSetSliderValue(panel->dockOpacityS, opacity);
+        updateDockOpacityLabel(panel);
 
         str = GetStringForKey("CompositorConfigPath");
         if (!str || !str[0])
@@ -414,6 +440,8 @@ static void storeData(_Panel *panel)
                 SetStringForKey(panel->configPath, "CompositorConfigPath");
         else
                 RemoveObjectForKey("CompositorConfigPath");
+
+        SetIntegerForKey(WMGetSliderValue(panel->dockOpacityS), "DockOpacity");
 
         SetBoolForKey(WMGetButtonSelected(panel->shadowB), "EnableWindowShadows");
 }
@@ -458,6 +486,12 @@ static void openConfig(WMWidget *w, void *data)
         launch_editor_for_config((_Panel *)data);
 }
 
+static void dockOpacityChanged(WMWidget *w, void *data)
+{
+        (void)w;
+        updateDockOpacityLabel((_Panel *)data);
+}
+
 static void layout_effects_panel(_Panel *panel)
 {
         const int outerMargin = 8;
@@ -477,6 +511,8 @@ static void layout_effects_panel(_Panel *panel)
         int visibleHeight;
         int y;
         int compY;
+        int sliderWidth;
+        int valueWidth;
         int totalHeight;
         int toggleWidth;
         int buttonWidth;
@@ -567,6 +603,19 @@ static void layout_effects_panel(_Panel *panel)
         WMMoveWidget(panel->shadowB, innerMargin, compY);
 
         compY += 28 + spacing;
+
+        WMResizeWidget(panel->dockOpacityL, labelWidth, rowHeight);
+        WMMoveWidget(panel->dockOpacityL, innerMargin, compY);
+        valueWidth = 48;
+        sliderWidth = controlWidth - valueWidth - 6;
+        if (sliderWidth < 120)
+                sliderWidth = 120;
+        WMResizeWidget(panel->dockOpacityS, sliderWidth, rowHeight);
+        WMMoveWidget(panel->dockOpacityS, controlX, compY);
+        WMResizeWidget(panel->dockOpacityValueL, valueWidth, rowHeight);
+        WMMoveWidget(panel->dockOpacityValueL, controlX + sliderWidth + 6, compY);
+
+        compY += rowHeight + spacing;
 
         WMResizeWidget(panel->configPathL, availableWidth, 48);
         WMMoveWidget(panel->configPathL, innerMargin, compY);
@@ -707,6 +756,18 @@ static void createPanel(Panel *p)
         WMMoveWidget(panel->openConfigB, 10, 90);
         WMSetButtonText(panel->openConfigB, _("Edit configuration"));
         WMSetButtonAction(panel->openConfigB, openConfig, panel);
+
+        panel->dockOpacityL = WMCreateLabel(panel->compositorF);
+        WMSetLabelText(panel->dockOpacityL, _("Dock transparency:"));
+
+        panel->dockOpacityS = WMCreateSlider(panel->compositorF);
+        WMSetSliderMinValue(panel->dockOpacityS, 0);
+        WMSetSliderMaxValue(panel->dockOpacityS, 100);
+        WMSetSliderContinuous(panel->dockOpacityS, True);
+        WMSetSliderAction(panel->dockOpacityS, dockOpacityChanged, panel);
+
+        panel->dockOpacityValueL = WMCreateLabel(panel->compositorF);
+        WMSetLabelTextAlignment(panel->dockOpacityValueL, WARight);
 
         panel->hintL = WMCreateLabel(panel->compositorF);
         WMResizeWidget(panel->hintL, FRAME_WIDTH - 210, 60);

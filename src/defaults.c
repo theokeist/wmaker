@@ -157,6 +157,7 @@ static WDECallbackUpdate setHotCornerActions;
 static WDECallbackConvert getCursor;
 static WDECallbackUpdate setCursor;
 static WDECallbackUpdate updateDock;
+static WDECallbackUpdate updateDockOpacity;
 
 /*
  * Tables to convert strings to enumeration values.
@@ -449,6 +450,8 @@ WDefaultEntry optionList[] = {
             &wPreferences.enable_window_shadows, getBool, NULL, NULL, NULL},
         {"AutostartCompositor", "YES", NULL,
             &wPreferences.autostart_compositor, getBool, NULL, NULL, NULL},
+        {"DockOpacity", "100", NULL,
+            &wPreferences.dock_opacity, getInt, updateDockOpacity, NULL, NULL},
         {"ShowWindowContentsDuringAnimations", "NO", NULL,
             &wPreferences.show_window_contents_in_animations, getBool, NULL, NULL, NULL},
 	{"ShadeSpeed", "fast", seSpeeds,
@@ -3616,6 +3619,19 @@ static int updateDock(WScreen * scr, WDefaultEntry * entry,
 
 	if (scr->dock)
 		wDockSwap(scr->dock);
+
+	return 0;
+}
+
+static int updateDockOpacity(WScreen *scr, WDefaultEntry *entry,
+			     void *tdata, void *extra_data)
+{
+	(void) entry;
+	(void) tdata;
+	(void) extra_data;
+
+	if (scr)
+		wDockApplyOpacity(scr);
 
 	return 0;
 }
