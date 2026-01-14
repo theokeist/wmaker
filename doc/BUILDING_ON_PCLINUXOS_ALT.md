@@ -7,11 +7,16 @@ texture and icon pipeline enabled.
 
 ## Common preparation
 
-Install the toolchain and autotools needed for Git checkouts:
+Install the toolchain and autotools needed for Git checkouts (use `dnf` on
+RPM-based PCLinuxOS spins):
 
 ```sh
 sudo apt-get update
 sudo apt-get install gcc make autoconf automake libtool pkgconfig git gettext
+```
+
+```sh
+sudo dnf install gcc make autoconf automake libtool pkgconfig git gettext
 ```
 
 If you are building from a release tarball, `autoconf`/`automake`/`libtool` are
@@ -23,6 +28,16 @@ already handled and you can skip them.
 
 ```sh
 sudo apt-get install \
+  libX11-devel libXext-devel libXrandr-devel libXinerama-devel libXcursor-devel \
+  libXrender-devel libXpm-devel libXmu-devel libSM-devel libICE-devel \
+  freetype-devel fontconfig-devel libXft-devel \
+  libpng-devel libjpeg-devel libtiff-devel giflib-devel libwebp-devel \
+  libXcomposite-devel libXdamage-devel libXfixes-devel libXss-devel \
+  mesa-libGL-devel mesa-utils
+```
+
+```sh
+sudo dnf install \
   libX11-devel libXext-devel libXrandr-devel libXinerama-devel libXcursor-devel \
   libXrender-devel libXpm-devel libXmu-devel libSM-devel libICE-devel \
   freetype-devel fontconfig-devel libXft-devel \
@@ -49,6 +64,11 @@ sudo make install
 
 ```sh
 sudo apt-get install picom
+./configure --prefix=/usr/local --with-compositor=picom
+```
+
+```sh
+sudo dnf install picom
 ./configure --prefix=/usr/local --with-compositor=picom
 ```
 
