@@ -891,7 +891,7 @@ static char *resolve_config_path(const char *path)
 
         if (!path || !*path)
                 return NULL;
-
+: one helper that auto-creates template on selection currently checks Picom specifically, while broader config support logic includes Compton too
         expanded = wexpandpath(path);
         if (!expanded)
                 return NULL;
