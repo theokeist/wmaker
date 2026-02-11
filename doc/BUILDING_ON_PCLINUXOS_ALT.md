@@ -63,19 +63,16 @@ sudo make install
 ### 3. (Optional) Enable compositor defaults
 
 ```sh
-sudo apt-get install picom
-./configure --prefix=/usr/local --with-compositor=picom
+sudo apt-get install picom compton xcompmgr compiz
+./configure --prefix=/usr/local --with-compositor=<picom|compton|xcompmgr|compiz|none>
 ```
 
 ```sh
-sudo dnf install picom
-./configure --prefix=/usr/local --with-compositor=picom
+sudo dnf install picom compton xcompmgr compiz
+./configure --prefix=/usr/local --with-compositor=<picom|compton|xcompmgr|compiz|none>
 ```
 
-After installation, open **WPrefs → Animations & Effects**, choose **Picom**,
-then enable **Start compositor automatically** and **window shadows** if you
-want the modern effects path. The GLX backend needs `mesa-libGL-devel` at build
-and `mesa-utils` at runtime.
+After installation, open **WPrefs → Animations & Effects**, choose your preferred compositor, then enable **Start compositor automatically** and **window shadows** if you want the modern effects path. The GLX backend needs `mesa-libGL-devel` at build and `mesa-utils` at runtime. Picom and Compton also expose template-backed configuration editing from the same panel.
 
 ## ALT Linux
 
@@ -109,13 +106,11 @@ sudo make install
 ### 3. (Optional) Enable compositor defaults
 
 ```sh
-sudo apt-get install picom
-./configure --prefix=/usr/local --with-compositor=picom
+sudo apt-get install picom compton xcompmgr compiz
+./configure --prefix=/usr/local --with-compositor=<picom|compton|xcompmgr|compiz|none>
 ```
 
-Select **Picom** in **WPrefs → Animations & Effects**, then toggle the compositor
-and shadow options to preview the bundled configuration at
-`~/.config/picom/picom.conf`.
+Select your compositor in **WPrefs → Animations & Effects**, then toggle the compositor and shadow options. For Picom/Compton, the panel can initialize and open a template-backed config (for example `~/.config/picom/picom.conf` or `~/.config/compton.conf`).
 
 ## Verifying the result
 

@@ -82,25 +82,16 @@ you want to stage everything under a temporary directory instead, pass
 
 ### 5. (Optional) Wire in compositor defaults and shadows
 
-Window Maker's modern animations rely on an external compositor. Install Picom
-and ask `configure` to ship Picom defaults so new users see the effects without
-extra tweaking:
+Window Maker's modern animations rely on an external compositor. Install one or
+more compositor packages and choose a default backend at build time:
 
 ```sh
-sudo apt install picom
-./configure --prefix=/usr/local --with-compositor=picom
+sudo apt install picom compton xcompmgr compiz
+./configure --prefix=/usr/local --with-compositor=<picom|compton|xcompmgr|compiz|none>
 ```
 
-The Picom template lands in `/usr/local/share/WindowMaker/Compositors/picom.conf`.
-After installing, open **WPrefs → Animations & Effects**, pick **Picom** as the
-preferred compositor, enable **Start compositor automatically** and **window
-shadows** as desired, and use the **Edit configuration** button if you want to
-extend the shipped blur or shadow settings. Window Maker will create the
-per-user Picom configuration automatically when you select the compositor or
-launch the editor, and the editor button honours `$VISUAL`, `$EDITOR`, or falls
-back to `xdg-open` (installable from `xdg-utils`) so the file opens in your
-system's default text editor. The package list above includes Mesa's GLX
-components so the bundled Picom preset can use the `glx` backend immediately.
+Picom and Compton templates land in `/usr/local/share/WindowMaker/Compositors/` as `picom.conf` and `compton.conf`.
+After installing, open **WPrefs → Animations & Effects**, pick your preferred compositor, enable **Start compositor automatically** and **window shadows** as desired, and use the **Edit configuration** button for providers with templates (Picom/Compton). Window Maker will create the per-user configuration automatically for those template-backed providers when you select the compositor or launch the editor, and the editor button honours `$VISUAL`, `$EDITOR`, or falls back to `xdg-open` (installable from `xdg-utils`) so the file opens in your system's default text editor. The package list above includes Mesa's GLX components so Picom/Compton presets can use the `glx` backend immediately.
 
 ## Ubuntu 25.10 (Oracular Oriole)
 
@@ -152,20 +143,15 @@ advice once the build is installed.
 
 ### 4. (Optional) Enable compositor integration
 
-Ubuntu pulls Picom from the universe repository. Install it alongside Window
-Maker so the Animations & Effects panel can start the compositor automatically:
+Ubuntu repositories provide several compositors. Install them alongside Window Maker so the Animations & Effects panel can start your selected compositor automatically:
 
 ```sh
-sudo apt install picom
-./configure --prefix=/usr/local --with-compositor=picom
+sudo apt install picom compton xcompmgr compiz
+./configure --prefix=/usr/local --with-compositor=<picom|compton|xcompmgr|compiz|none>
 ```
 
-After installation, launch WPrefs, switch to **Animations & Effects**, choose the
-Picom entry, enable **Start compositor automatically** if you want Window Maker
-to launch Picom on login, and toggle **window shadows** to preview the blended
-minimize/restore paths. The configuration editor in that panel updates the Picom
-template under `~/.config/picom/picom.conf` the first time you open it, and the
-Mesa packages installed earlier provide the GLX backend Picom expects.
+After installation, launch WPrefs, switch to **Animations & Effects**, choose your preferred backend (Picom/Compton/Xcompmgr/Compiz), enable **Start compositor automatically** if you want Window Maker
+to launch the selected compositor on login, and toggle **window shadows** to preview the blended minimize/restore paths. The configuration editor in that panel updates template-backed configs (for example `~/.config/picom/picom.conf` or `~/.config/compton.conf`) the first time you open it, and the Mesa packages installed earlier provide the GLX backend Picom/Compton expect.
 
 ## Verifying the result
 

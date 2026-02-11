@@ -21,6 +21,7 @@ WPrefs.desktop: WPrefs.desktop.in
 		       -e "s:#wprefs_datadir#:${wprefs_datadir}:" $< > $@
 
 EXTRA_DIST = $(wpdata_DATA) \
+	EffectsInternal.h \
 	KeyboardSettings.c \
 	Themes.c \
 	WPrefs.desktop.in
@@ -49,6 +50,9 @@ WPrefs_SOURCES = \
 	TexturePanel.h \
 	WindowHandling.c \
 	Effects.c \
+	EffectsLayout.c \
+	EffectsSettings.c \
+	EffectsCompositor.c \
 	Workspace.c \
 	double.c \
 	editmenu.c \

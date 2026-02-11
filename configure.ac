@@ -864,7 +864,7 @@ AC_SUBST(HEADER_SEARCH_PATH)
 m4_divert_push([INIT_PREPARE])dnl
 AC_ARG_WITH([compositor],
     [AS_HELP_STRING([--with-compositor=NAME],
-        [select default compositor integration (picom|none) @<:@none@:>@])],
+        [select default compositor integration (picom|compton|xcompmgr|compiz|none) @<:@none@:>@])],
     [with_compositor="$withval"],
     [with_compositor=none])
 m4_divert_pop([INIT_PREPARE])dnl
@@ -872,9 +872,15 @@ m4_divert_pop([INIT_PREPARE])dnl
 AS_CASE([$with_compositor],
     [picom], [wm_compositor_name=Picom
               wm_compositor_config='~/.config/picom/picom.conf'],
+    [compton], [wm_compositor_name=Compton
+                wm_compositor_config='~/.config/compton.conf'],
+    [xcompmgr], [wm_compositor_name=Xcompmgr
+                 wm_compositor_config=''],
+    [compiz], [wm_compositor_name=Compiz
+               wm_compositor_config=''],
     [none], [wm_compositor_name=None
              wm_compositor_config=''],
-    [AC_MSG_ERROR([unsupported compositor "$with_compositor" (use picom or none)])])
+    [AC_MSG_ERROR([unsupported compositor "$with_compositor" (use picom, compton, xcompmgr, compiz or none)])])
 
 AC_SUBST([DEFAULT_COMPOSITOR_NAME], [$wm_compositor_name])
 AC_SUBST([DEFAULT_COMPOSITOR_CONFIG_PATH], [$wm_compositor_config])
