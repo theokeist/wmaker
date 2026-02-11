@@ -37,6 +37,7 @@
 #include "actions.h"
 #include "workspace.h"
 #include "placement.h"
+#include "misc.h"
 
 #include "geomview.h"
 #include "screen.h"
@@ -413,19 +414,36 @@ static void mapGeometryDisplay(WWindow * wwin, int x, int y, int w, int h)
 	showGeometry(wwin, x, y, x + w, y + h, 0);
 }
 
-static void doWindowMove(WWindow * wwin, WMArray * array, int dx, int dy)
+static void doWindowMove(WWindow *wwin, WMArray *array, int dx, int dy, Bool animate)
 {
-	WWindow *tmpw;
-	WScreen *scr = wwin->screen_ptr;
-	int x, y;
+        WWindow *tmpw;
+        WScreen *scr = wwin->screen_ptr;
+        int x, y;
+        Bool use_effect;
 
-	if (!array || !WMGetArrayItemCount(array)) {
-		wWindowMove(wwin, wwin->frame_x + dx, wwin->frame_y + dy);
-	} else {
-		WMArrayIterator iter;
+        use_effect = animate && !wPreferences.no_animations &&
+                wPreferences.window_movement_effect != WMEFFECT_CURVE_CLASSIC;
 
-		WM_ITERATE_ARRAY(array, tmpw, iter) {
-			x = tmpw->frame_x + dx;
+        if (!array || !WMGetArrayItemCount(array)) {
+                int target_x = wwin->frame_x + dx;
+                int target_y = wwin->frame_y + dy;
+
+                if (WFLAGP(wwin, dont_move_off))
+                        wScreenBringInside(wwin->screen_ptr, &target_x, &target_y,
+                                           wwin->frame->core->width, wwin->frame->core->height);
+
+                if (use_effect && (target_x != wwin->frame_x || target_y != wwin->frame_y))
+                        slide_window_with_curve(wwin->frame->core->window,
+                                                wwin->frame_x, wwin->frame_y,
+                                                target_x, target_y,
+                                                wPreferences.window_movement_effect);
+
+                wWindowMove(wwin, target_x, target_y);
+        } else {
+                WMArrayIterator iter;
+
+                WM_ITERATE_ARRAY(array, tmpw, iter) {
+                        x = tmpw->frame_x + dx;
 			y = tmpw->frame_y + dy;
 
 #if 1				/* XXX: with xinerama patch was #if 0, check this */
@@ -445,9 +463,20 @@ static void doWindowMove(WWindow * wwin, WMArray * array, int dx, int dy)
 					   (int)tmpw->frame->core->width, (int)tmpw->frame->core->height);
 #endif
 
-			wWindowMove(tmpw, x, y);
-		}
-	}
+                        if (WFLAGP(tmpw, dont_move_off))
+                                wScreenBringInside(tmpw->screen_ptr, &x, &y,
+                                                   tmpw->frame->core->width,
+                                                   tmpw->frame->core->height);
+
+                        if (use_effect && (x != tmpw->frame_x || y != tmpw->frame_y))
+                                slide_window_with_curve(tmpw->frame->core->window,
+                                                        tmpw->frame_x, tmpw->frame_y,
+                                                        x, y,
+                                                        wPreferences.window_movement_effect);
+
+                        wWindowMove(tmpw, x, y);
+                }
+        }
 }
 
 static void drawTransparentFrame(WWindow * wwin, int x, int y, int width, int height)
@@ -1164,8 +1193,8 @@ updateWindowPosition(WWindow * wwin, MoveData * data, Bool doResistance,
 		if (wPreferences.move_display == WDIS_NEW && !scr->selected_windows) {
 			showPosition(wwin, data->realX, data->realY);
 		}
-		if (opaqueMove) {
-			doWindowMove(wwin, scr->selected_windows, newX - wwin->frame_x, newY - wwin->frame_y);
+                if (opaqueMove) {
+                        doWindowMove(wwin, scr->selected_windows, newX - wwin->frame_x, newY - wwin->frame_y, False);
 		} else {
 			/* erase frames */
 			drawFrames(wwin, scr->selected_windows,
@@ -1657,7 +1686,8 @@ int wKeyboardMoveResizeWindow(WWindow * wwin)
 						WMArrayIterator iter;
 						WWindow *foo;
 
-						doWindowMove(wwin, scr->selected_windows, off_x, off_y);
+                                                doWindowMove(wwin, scr->selected_windows, off_x, off_y,
+                                                             True);
 
 						WM_ITERATE_ARRAY(scr->selected_windows, foo, iter) {
 							wWindowSynthConfigureNotify(foo);
@@ -1928,9 +1958,10 @@ int wMouseMoveWindow(WWindow * wwin, XEvent * ev)
 					drawFrames(wwin, scr->selected_windows,
 						   moveData.realX - wwin->frame_x, moveData.realY - wwin->frame_y);
 					XSync(dpy, 0);
-					doWindowMove(wwin, scr->selected_windows,
-						     moveData.realX - wwin->frame_x,
-						     moveData.realY - wwin->frame_y);
+                                        doWindowMove(wwin, scr->selected_windows,
+                                                     moveData.realX - wwin->frame_x,
+                                                     moveData.realY - wwin->frame_y,
+                                                     True);
 				}
 #ifndef CONFIGURE_WINDOW_WHILE_MOVING
 				wWindowSynthConfigureNotify(wwin);

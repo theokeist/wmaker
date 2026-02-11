@@ -48,6 +48,7 @@ EXTRA_DIST = TODO BUGS BUGFORM FAQ INSTALL \
 	README COPYING.WTFPL autogen.sh \
 	email-clients.txt checkpatch.pl update-changelog.pl \
 	script/check-cmdline-options-doc.sh \
+	script/check-compositor-integration.sh \
 	script/check-translation-sources.sh \
 	script/check-wmaker-loaddef-callbacks.sh \
 	script/generate-html-from-man.sh \

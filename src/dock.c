@@ -24,12 +24,14 @@
 #include "wconfig.h"
 
 #include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <libgen.h>
 #include <string.h>
 #include <strings.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <math.h>
 #include <limits.h>
@@ -68,6 +70,8 @@
 
 #define MOD_MASK wPreferences.modifier_mask
 #define ICON_SIZE wPreferences.icon_size
+
+static Atom dock_opacity_atom = None;
 
 /***** Local variables ****/
 
@@ -115,6 +119,8 @@ static void launchDockedApplication(WAppIcon *btn, Bool withSelection);
 
 static void clipAutoLower(void *cdata);
 static void clipAutoRaise(void *cdata);
+static void applyDockOpacityToIcon(WAppIcon *icon);
+static void applyDockOpacityToDock(WDock *dock);
 static WAppIcon *mainIconCreate(WScreen *scr, int type, const char *name);
 
 static void drawerIconExpose(WObjDescriptor *desc, XEvent *event);
@@ -161,6 +167,55 @@ static void make_keys(void)
 	dDock = WMCreatePLString("Dock");
 	dClip = WMCreatePLString("Clip");
 	dDrawers = WMCreatePLString("Drawers");
+}
+
+static void setWindowOpacity(Window window, int percent)
+{
+	uint32_t opacity;
+
+	if (window == None)
+		return;
+
+	if (dock_opacity_atom == None)
+		dock_opacity_atom = XInternAtom(dpy, "_NET_WM_WINDOW_OPACITY", False);
+
+	if (dock_opacity_atom == None)
+		return;
+
+	if (percent >= 100) {
+		XDeleteProperty(dpy, window, dock_opacity_atom);
+		return;
+	}
+
+	if (percent < 0)
+		percent = 0;
+	if (percent > 100)
+		percent = 100;
+
+	opacity = (uint32_t)((0xffffffffu * (uint64_t)percent) / 100u);
+	XChangeProperty(dpy, window, dock_opacity_atom, XA_CARDINAL, 32,
+			PropModeReplace, (unsigned char *)&opacity, 1);
+}
+
+static void applyDockOpacityToIcon(WAppIcon *icon)
+{
+	if (!icon || !icon->icon || !icon->icon->core)
+		return;
+
+	setWindowOpacity(icon->icon->core->window, wPreferences.dock_opacity);
+}
+
+static void applyDockOpacityToDock(WDock *dock)
+{
+	int i;
+
+	if (!dock)
+		return;
+
+	for (i = 0; i < dock->max_icons; i++) {
+		if (dock->icon_array[i])
+			applyDockOpacityToIcon(dock->icon_array[i]);
+	}
 }
 
 static void renameCallback(WMenu *menu, WMenuEntry *entry)
@@ -818,6 +873,7 @@ static void unhideHereCallback(WMenu *menu, WMenuEntry *entry)
 static int getDockXPosition(WScreen *scr, Bool on_right_side)
 {
 	int x;
+	int max_x;
 
 	if (wPreferences.keep_dock_on_primary_head) {
 		WMRect rect;
@@ -834,6 +890,12 @@ static int getDockXPosition(WScreen *scr, Bool on_right_side)
 		else
 			x = DOCK_EXTRA_SPACE;
 	}
+
+	max_x = WMAX(0, scr->scr_width - ICON_SIZE);
+	if (x < 0)
+		x = 0;
+	else if (x > max_x)
+		x = max_x;
 
 	return x;
 }
@@ -928,10 +990,17 @@ static void switchWSCommand(WMenu *menu, WMenuEntry *entry)
 
 static void launchDockedApplication(WAppIcon *btn, Bool withSelection)
 {
-	WScreen *scr = btn->icon->core->screen_ptr;
+        WScreen *scr = btn->icon->core->screen_ptr;
 
-	if (!btn->launching &&
-	    ((!withSelection && btn->command != NULL) || (withSelection && btn->paste_command != NULL))) {
+        if (btn->running && (!btn->main_window || !wApplicationOf(btn->main_window))) {
+                btn->running = 0;
+                btn->relaunching = 0;
+                btn->launching = 0;
+                btn->main_window = None;
+        }
+
+        if (!btn->launching &&
+            ((!withSelection && btn->command != NULL) || (withSelection && btn->paste_command != NULL))) {
 		if (!btn->forced_dock) {
 			btn->relaunching = btn->running;
 			btn->running = 1;
@@ -1334,11 +1403,11 @@ WDock *wDockCreate(WScreen *scr, int type, const char *name)
 		dock->max_icons = DOCK_MAX_ICONS;
 		break;
 	case WM_DRAWER:
-		dock->max_icons = scr->scr_width / wPreferences.icon_size;
+		dock->max_icons = WMAX(1, scr->scr_width / wPreferences.icon_size);
 		break;
 	case WM_DOCK:
 	default:
-		dock->max_icons = scr->scr_height / wPreferences.icon_size;
+		dock->max_icons = WMAX(1, scr->scr_height / wPreferences.icon_size);
 	}
 
 	dock->icon_array = wmalloc(sizeof(WAppIcon *) * dock->max_icons);
@@ -1346,6 +1415,7 @@ WDock *wDockCreate(WScreen *scr, int type, const char *name)
 	btn = mainIconCreate(scr, type, name);
 
 	btn->dock = dock;
+	applyDockOpacityToIcon(btn);
 
 	dock->x_pos = btn->x_pos;
 	dock->y_pos = btn->y_pos;
@@ -1773,8 +1843,10 @@ WAppIcon *wClipRestoreState(WScreen *scr, WMPropList *clip_state)
 
 	icon = mainIconCreate(scr, WM_CLIP, NULL);
 
-	if (!clip_state)
+	if (!clip_state) {
+		applyDockOpacityToIcon(icon);
 		return icon;
+	}
 
 	WMRetainPropList(clip_state);
 
@@ -1805,6 +1877,8 @@ WAppIcon *wClipRestoreState(WScreen *scr, WMPropList *clip_state)
 		icon->paste_command = wstrdup(WMGetFromPLString(value));
 
 	WMReleasePropList(clip_state);
+
+	applyDockOpacityToIcon(icon);
 
 	return icon;
 }
@@ -1979,6 +2053,7 @@ WDock *wDockRestoreState(WScreen *scr, WMPropList *dock_state, int type)
 		dock->icon_array[dock->icon_count] = aicon;
 
 		if (aicon) {
+			applyDockOpacityToIcon(aicon);
 			aicon->dock = dock;
 			aicon->x_pos = dock->x_pos + (aicon->xindex * ICON_SIZE);
 			aicon->y_pos = dock->y_pos + (aicon->yindex * ICON_SIZE);
@@ -2234,6 +2309,7 @@ Bool wDockAttachIcon(WDock *dock, WAppIcon *icon, int x, int y, Bool update_icon
 	icon->icon->core->descriptor.handle_leavenotify = clipLeaveNotify;
 	icon->icon->core->descriptor.parent_type = WCLASS_DOCK_ICON;
 	icon->icon->core->descriptor.parent = icon;
+	applyDockOpacityToIcon(icon);
 
 	MoveInStackListUnder(dock->icon_array[index - 1]->icon->core, icon->icon->core);
 	wAppIconMove(icon, icon->x_pos, icon->y_pos);
@@ -3054,6 +3130,28 @@ void wDockSwap(WDock *dock)
 	wScreenUpdateUsableArea(scr);
 }
 
+void wDockApplyOpacity(WScreen *scr)
+{
+	WDrawerChain *dc;
+	int i;
+
+	if (!scr)
+		return;
+
+	applyDockOpacityToDock(scr->dock);
+
+	for (i = 0; i < scr->workspace_count; i++) {
+		if (scr->workspaces[i] && scr->workspaces[i]->clip)
+			applyDockOpacityToDock(scr->workspaces[i]->clip);
+	}
+
+	if (scr->clip_icon)
+		applyDockOpacityToIcon(scr->clip_icon);
+
+	for (dc = scr->drawers; dc != NULL; dc = dc->next)
+		applyDockOpacityToDock(dc->adrawer);
+}
+
 static pid_t execCommand(WAppIcon *btn, const char *command, WSavedState *state)
 {
 	WScreen *scr = btn->icon->core->screen_ptr;
@@ -3291,19 +3389,22 @@ void wDockTrackWindowLaunch(WDock *dock, Window window)
 				dockIconPaint(icon);
 
 				aicon = wAppIconCreateForDock(dock->screen_ptr, NULL,
-							      wm_instance, wm_class, TILE_NORMAL);
-				/* XXX: can: aicon->icon == NULL ? */
-				PlaceIcon(dock->screen_ptr, &x0, &y0, wGetHeadForWindow(aicon->icon->owner));
-				wAppIconMove(aicon, x0, y0);
-				/* Should this always be lowered? -Dan */
-				if (dock->lowered)
-					wLowerFrame(aicon->icon->core);
-				XMapWindow(dpy, aicon->icon->core->window);
-				aicon->launching = 1;
-				wAppIconPaint(aicon);
-				slide_window(aicon->icon->core->window, x0, y0, icon->x_pos, icon->y_pos);
-				XUnmapWindow(dpy, aicon->icon->core->window);
-				wAppIconDestroy(aicon);
+					      wm_instance, wm_class, TILE_NORMAL);
+				if (aicon && aicon->icon && aicon->icon->core) {
+					PlaceIcon(dock->screen_ptr, &x0, &y0, wGetHeadForWindow(aicon->icon->owner));
+					wAppIconMove(aicon, x0, y0);
+					/* Should this always be lowered? -Dan */
+					if (dock->lowered)
+						wLowerFrame(aicon->icon->core);
+					XMapWindow(dpy, aicon->icon->core->window);
+					aicon->launching = 1;
+					wAppIconPaint(aicon);
+					slide_window_with_curve(aicon->icon->core->window, x0, y0, icon->x_pos, icon->y_pos,
+						wPreferences.launch_effect);
+					XUnmapWindow(dpy, aicon->icon->core->window);
+				}
+				if (aicon)
+					wAppIconDestroy(aicon);
 			}
 			wDockFinishLaunch(icon);
 			break;

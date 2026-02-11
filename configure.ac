@@ -100,6 +100,30 @@ AC_PROG_LN_S
 LT_INIT
 
 
+dnl Embed runtime search paths so installations under /usr/local/lib work out
+dnl of the box unless the user explicitly opts out.
+AC_ARG_ENABLE([runpath],
+    [AS_HELP_STRING([--disable-runpath],
+        [do not embed runtime library search paths in executables])],
+    [want_runpath=$enableval],
+    [want_runpath=yes])
+
+AS_IF([test "x$want_runpath" = "xyes"],
+    [save_prefix=$prefix
+     save_exec_prefix=$exec_prefix
+     AS_IF([test "x$prefix" = "xNONE"], [prefix=$ac_default_prefix])
+     AS_IF([test "x$exec_prefix" = "xNONE"], [exec_prefix=$prefix])
+     eval expanded_libdir="$libdir"
+     prefix=$save_prefix
+     exec_prefix=$save_exec_prefix
+     AS_CASE([$expanded_libdir],
+        [/lib*|/usr/lib*], [WMAKER_RUNPATH_FLAGS=''],
+        [*], [WMAKER_RUNPATH_FLAGS="-Wl,-rpath,$expanded_libdir"])
+    ],
+    [WMAKER_RUNPATH_FLAGS=''])
+AC_SUBST([WMAKER_RUNPATH_FLAGS])
+
+
 dnl Debugging Options
 dnl =================
 m4_divert_push([INIT_PREPARE])dnl
@@ -836,6 +860,30 @@ HEADER_SEARCH_PATH="$inc_search_path"
 
 AC_SUBST(LIBRARY_SEARCH_PATH)
 AC_SUBST(HEADER_SEARCH_PATH)
+
+m4_divert_push([INIT_PREPARE])dnl
+AC_ARG_WITH([compositor],
+    [AS_HELP_STRING([--with-compositor=NAME],
+        [select default compositor integration (picom|compton|xcompmgr|compiz|none) @<:@none@:>@])],
+    [with_compositor="$withval"],
+    [with_compositor=none])
+m4_divert_pop([INIT_PREPARE])dnl
+
+AS_CASE([$with_compositor],
+    [picom], [wm_compositor_name=Picom
+              wm_compositor_config='~/.config/picom/picom.conf'],
+    [compton], [wm_compositor_name=Compton
+                wm_compositor_config='~/.config/compton.conf'],
+    [xcompmgr], [wm_compositor_name=Xcompmgr
+                 wm_compositor_config=''],
+    [compiz], [wm_compositor_name=Compiz
+               wm_compositor_config=''],
+    [none], [wm_compositor_name=None
+             wm_compositor_config=''],
+    [AC_MSG_ERROR([unsupported compositor "$with_compositor" (use picom, compton, xcompmgr, compiz or none)])])
+
+AC_SUBST([DEFAULT_COMPOSITOR_NAME], [$wm_compositor_name])
+AC_SUBST([DEFAULT_COMPOSITOR_CONFIG_PATH], [$wm_compositor_config])
 
 
 AC_SUBST(GFXLIBS)

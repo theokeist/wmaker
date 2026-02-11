@@ -939,6 +939,7 @@ void wScreenRestoreState(WScreen * scr)
 	}
 
 	wWorkspaceRestoreState(scr);
+	wDockApplyOpacity(scr);
 	wScreenUpdateUsableArea(scr);
 }
 

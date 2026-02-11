@@ -6,6 +6,8 @@ wpexecbindir = @wprefs_bindir@
 
 wpexecbin_PROGRAMS = WPrefs
 
+AM_LDFLAGS = $(WMAKER_RUNPATH_FLAGS)
+
 wpdatadir = @wprefs_datadir@
 
 wpdata_DATA = WPrefs.tiff WPrefs.xpm
@@ -19,6 +21,7 @@ WPrefs.desktop: WPrefs.desktop.in
 		       -e "s:#wprefs_datadir#:${wprefs_datadir}:" $< > $@
 
 EXTRA_DIST = $(wpdata_DATA) \
+	EffectsInternal.h \
 	KeyboardSettings.c \
 	Themes.c \
 	WPrefs.desktop.in
@@ -46,6 +49,10 @@ WPrefs_SOURCES = \
 	TexturePanel.c \
 	TexturePanel.h \
 	WindowHandling.c \
+	Effects.c \
+	EffectsLayout.c \
+	EffectsSettings.c \
+	EffectsCompositor.c \
 	Workspace.c \
 	double.c \
 	editmenu.c \

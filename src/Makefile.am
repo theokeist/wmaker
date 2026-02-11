@@ -1,5 +1,7 @@
 AUTOMAKE_OPTIONS =
 
+AM_LDFLAGS = $(WMAKER_RUNPATH_FLAGS)
+
 BUILT_SOURCES = wconfig.h
 
 bin_PROGRAMS = wmaker
@@ -23,6 +25,8 @@ wmaker_SOURCES = 	\
 	client.h \
 	colormap.c \
 	colormap.h \
+	compositor.c \
+	compositor.h \
 	cycling.c \
 	cycling.h \
 	def_pixmaps.h \
@@ -151,9 +155,10 @@ endif
 AM_CFLAGS = @PANGO_CFLAGS@
 
 AM_CPPFLAGS = $(DFLAGS) \
-	-I$(top_builddir)/wrlib \
-	-I$(top_srcdir)/WINGs -I$(top_builddir)/WINGs \
-	@HEADER_SEARCH_PATH@
+        -DWMAKER_RESOURCE_PATH=\"$(pkgdatadir)\" \
+        -I$(top_builddir)/wrlib \
+        -I$(top_srcdir)/WINGs -I$(top_builddir)/WINGs \
+        @HEADER_SEARCH_PATH@
 
 
 wmaker_LDADD = \
@@ -175,7 +180,7 @@ am__v_CHKOPTS_  = $(am__v_CHKOPTS_$(AM_DEFAULT_VERBOSITY))
 am__v_CHKOPTS_0 = @echo "  CHK      $@" ;
 am__v_CHKOPTS_1 =
 
-check-local: defaults-callbacks-static defaults-callbacks-dynamic
+check-local: defaults-callbacks-static defaults-callbacks-dynamic compositor-integration
 
 # Check that the callback functions used to load the configuration match
 # the type of the variable where the value will be stored
@@ -195,3 +200,6 @@ defaults-callbacks-dynamic:
 		--struct-def "legacy_minipreview_config=$(srcdir)/defaults.c"  \
 		--callback "getBool=char, getEnum=char, getInt=int"  \
 		--callback "getPathList=char*, getCoord=WCoord"
+
+compositor-integration:
+	$(AM_V_CHKOPTS)$(top_srcdir)/script/check-compositor-integration.sh

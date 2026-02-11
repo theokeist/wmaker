@@ -147,6 +147,16 @@ typedef enum {
 } RScalingFilter;
 
 
+typedef enum {
+	R_EFFECT_CURVE_CLASSIC = 0,
+	R_EFFECT_CURVE_SMOOTH,
+	R_EFFECT_CURVE_GENTLE
+} REffectCurve;
+
+
+double REffectProgressForCurve(REffectCurve curve, double progress);
+
+
 typedef struct RContextAttributes {
     int flags;
     RRenderingMode render_mode;
@@ -430,12 +440,26 @@ void RCombineAlpha(unsigned char *d, unsigned char *s, int s_has_alpha,
 		   int width, int height, int dwi, int swi, int opacity)
 	__wrlib_nonnull(1, 2);
 
+void RFitImageDimensions(unsigned src_width, unsigned src_height,
+                         unsigned max_width, unsigned max_height,
+                         int allow_upscale, unsigned *dest_width,
+                         unsigned *dest_height)
+        __wrlib_nonnull(6, 7);
+
 RImage *RScaleImage(RImage *image, unsigned new_width, unsigned new_height)
-	__wrlib_useresult __wrlib_nonalias;
+        __wrlib_useresult __wrlib_nonalias;
 
 RImage *RSmoothScaleImage(RImage *src, unsigned new_width,
                           unsigned new_height)
-	__wrlib_useresult __wrlib_nonalias __wrlib_nonnull(1);
+        __wrlib_useresult __wrlib_nonalias __wrlib_nonnull(1);
+
+RImage *RScaleImageToFit(RImage *image, unsigned max_width, unsigned max_height,
+                        int allow_upscale)
+        __wrlib_useresult __wrlib_nonalias;
+
+RImage *RSmoothScaleImageToFit(RImage *image, unsigned max_width, unsigned max_height,
+                              int allow_upscale)
+        __wrlib_useresult __wrlib_nonalias;
 
 RImage *RRotateImage(RImage *image, float angle)
 	__wrlib_useresult __wrlib_nonalias __wrlib_nonnull(1);

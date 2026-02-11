@@ -33,11 +33,17 @@ Bool UpdateDomainFile(WDDomain * domain);
 
 void move_window(Window win, int from_x, int from_y, int to_x, int to_y);
 void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int to_y);
+void slide_windows_with_curve(Window wins[], int n, int from_x, int from_y, int to_x, int to_y, signed char curve);
 void ParseWindowName(WMPropList *value, char **winstance, char **wclass, const char *where);
 
 static inline void slide_window(Window win, int from_x, int from_y, int to_x, int to_y)
 {
 	slide_windows(&win, 1, from_x, from_y, to_x, to_y);
+}
+
+static inline void slide_window_with_curve(Window win, int from_x, int from_y, int to_x, int to_y, signed char curve)
+{
+	slide_windows_with_curve(&win, 1, from_x, from_y, to_x, to_y, curve);
 }
 
 /* Helper is a 'wmsetbg' subprocess with sets the background for the current workspace */

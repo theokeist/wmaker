@@ -27,10 +27,13 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #ifdef __FreeBSD__
 #include <sys/signal.h>
 #endif
+#include <limits.h>
+#include <libgen.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>
@@ -58,6 +61,7 @@
 #include "main.h"
 #include "startup.h"
 #include "dock.h"
+#include "compositor.h"
 #include "workspace.h"
 #include "keybind.h"
 #include "framewin.h"
@@ -73,6 +77,7 @@
 #endif
 
 #include "xutil.h"
+#include <WINGs/WUtil.h>
 
 /* for SunOS */
 #ifndef SA_RESTART
@@ -89,6 +94,12 @@ static WScreen **wScreen = NULL;
 static unsigned int _NumLockMask = 0;
 static unsigned int _ScrollLockMask = 0;
 static void manageAllWindows(WScreen * scr, int crashed);
+
+static char *quote_argument(const char *path);
+static char *resolve_config_path(const char *path);
+static void startConfiguredCompositor(void);
+static Bool backend_supports_config(const WCompositorBackend *backend);
+static Bool ensure_backend_config(const WCompositorBackend *backend, const char *path);
 
 static int catchXError(Display * dpy, XErrorEvent * error)
 {
@@ -708,6 +719,8 @@ void StartUp(Bool defaultScreenOnly)
 		Exit(1);
 	}
 
+	startConfiguredCompositor();
+
 #ifndef HAVE_INOTIFY
 	/* setup defaults file polling */
 	if (!wPreferences.flags.noupdates)
@@ -838,4 +851,209 @@ static void manageAllWindows(WScreen * scr, int crashRecovery)
 	if (!wPreferences.flags.noclip)
 		wDockShowIcons(scr->workspaces[scr->current_workspace]->clip);
 	scr->flags.startup2 = 0;
+}
+
+static char *quote_argument(const char *path)
+{
+        const char *p;
+        size_t len;
+        char *buffer;
+        char *dst;
+
+        if (!path)
+                return NULL;
+
+        len = 2; /* surrounding quotes */
+        for (p = path; *p; p++) {
+                if (*p == '"' || *p == '\\\\')
+                        len += 2;
+                else
+                        len++;
+        }
+
+        buffer = wmalloc(len + 1);
+        dst = buffer;
+        *dst++ = '"';
+        for (p = path; *p; p++) {
+                if (*p == '"' || *p == '\\\\')
+                        *dst++ = '\\\\';
+                *dst++ = *p;
+        }
+        *dst++ = '"';
+        *dst = '\0';
+
+        return buffer;
+}
+
+static char *resolve_config_path(const char *path)
+{
+        char *expanded;
+
+        if (!path || !*path)
+                return NULL;
+
+        expanded = wexpandpath(path);
+        if (!expanded)
+                return NULL;
+
+        if (!*expanded) {
+                wfree(expanded);
+                return NULL;
+        }
+
+        return expanded;
+}
+
+static Bool backend_supports_config(const WCompositorBackend *backend)
+{
+        if (!backend)
+                return False;
+
+        return (backend->choice == WCOMPOSITOR_PICOM
+                || backend->choice == WCOMPOSITOR_COMPTON);
+}
+
+static Bool ensure_backend_config(const WCompositorBackend *backend, const char *path)
+{
+        struct stat st;
+        char template_path[PATH_MAX];
+        const char *template_name = NULL;
+        FILE *in;
+        FILE *out;
+        char *dircopy;
+        int ch;
+
+        if (!backend || !path || !*path)
+                return False;
+
+        if (!backend_supports_config(backend))
+                return False;
+
+        if (backend->choice == WCOMPOSITOR_PICOM)
+                template_name = "picom.conf";
+        else if (backend->choice == WCOMPOSITOR_COMPTON)
+                template_name = "compton.conf";
+
+        if (!template_name)
+                return False;
+
+        if (stat(path, &st) == 0)
+                return True;
+
+        dircopy = wstrdup(path);
+        if (dircopy) {
+                char *dirpath = dirname(dircopy);
+
+                if (dirpath && *dirpath)
+                        wmkdirhier(dirpath);
+                wfree(dircopy);
+        }
+
+        snprintf(template_path, sizeof(template_path), "%s/Compositors/%s", WMAKER_RESOURCE_PATH, template_name);
+
+        in = fopen(template_path, "r");
+        if (!in) {
+                int saved = errno;
+
+                out = fopen(path, "w");
+                if (!out) {
+                        wwarning(_("could not create %s: %s"), path, strerror(saved));
+                        return False;
+                }
+
+                fprintf(out, "# Window Maker compositor configuration placeholder\n");
+                fclose(out);
+                return True;
+        }
+
+        out = fopen(path, "w");
+        if (!out) {
+                int saved = errno;
+
+                fclose(in);
+                wwarning(_("could not write %s: %s"), path, strerror(saved));
+                return False;
+        }
+
+        while ((ch = fgetc(in)) != EOF)
+                fputc(ch, out);
+
+        fclose(in);
+        fclose(out);
+        return True;
+}
+
+static void startConfiguredCompositor(void)
+{
+        const WCompositorBackend *backend;
+        const WCompositorBackend *fallback;
+        char command[PATH_MAX * 2];
+        char *expanded = NULL;
+        char *quoted = NULL;
+
+        command[0] = '\0';
+
+        if (!wScreen || w_global.screen_count == 0)
+                return;
+
+        if (!wPreferences.autostart_compositor)
+                return;
+
+        backend = wCompositorGetBackend(wPreferences.compositor_choice);
+        fallback = wCompositorGetFallbackBackend();
+
+        if (!backend) {
+                wwarning(_("Unknown compositor selection %d; using %s backend."),
+                         wPreferences.compositor_choice,
+                         fallback->name);
+                backend = fallback;
+        }
+
+        if (!wCompositorBackendAvailable(backend)) {
+                wwarning(_("Configured compositor backend %s is not available; using %s backend."),
+                         backend->name,
+                         fallback->name);
+                backend = fallback;
+        }
+
+        if (backend->choice == WCOMPOSITOR_NONE)
+                return;
+
+        if (backend_supports_config(backend)
+            && wPreferences.compositor_config_path && wPreferences.compositor_config_path[0]) {
+                expanded = resolve_config_path(wPreferences.compositor_config_path);
+                if (expanded) {
+                        if (!ensure_backend_config(backend, expanded)) {
+                                wwarning(_("%s configuration %s could not be prepared; launching with defaults."),
+                                         backend->name, expanded);
+                                wfree(expanded);
+                                expanded = NULL;
+                        } else if (access(expanded, R_OK) != 0) {
+                                int saved = errno;
+
+                                wwarning(_("%s configuration %s is not accessible (%s); launching with defaults."),
+                                         backend->name, expanded, strerror(saved));
+                                wfree(expanded);
+                                expanded = NULL;
+                        }
+                }
+        }
+
+        if (expanded)
+                quoted = quote_argument(expanded);
+        if (!wCompositorBuildLaunchCommand(backend, quoted,
+                                           wPreferences.enable_window_shadows,
+                                           command, sizeof(command))) {
+                wwarning(_("Could not build launch command for compositor backend %s."),
+                         backend->name);
+                command[0] = '\0';
+        }
+
+        if (command[0] != '\0')
+                ExecuteShellCommand(wScreen[0], command);
+
+        if (quoted)
+                wfree(quoted);
+        if (expanded)
+                wfree(expanded);
 }
