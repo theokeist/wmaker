@@ -152,6 +152,7 @@ void Initialize(WMScreen *scr);
 Panel *InitAppearance(WMWidget *parent);
 Panel *InitConfigurations(WMWidget *parent);
 Panel *InitDocks(WMWidget *parent);
+Panel *InitEffects(WMWidget *parent);
 Panel *InitExpert(WMWidget *parent);
 Panel *InitFocus(WMWidget *parent);
 Panel *InitFontSimple(WMWidget *parent);
@@ -167,9 +168,9 @@ Panel *InitWindowHandling(WMWidget *parent);
 Panel *InitWorkspace(WMWidget *parent);
 
 
-#define FRAME_TOP	105
-#define FRAME_LEFT	-2
-#define FRAME_WIDTH	524
-#define FRAME_HEIGHT	235
+#define FRAME_TOP	0
+#define FRAME_LEFT	0
+#define FRAME_WIDTH	560
+#define FRAME_HEIGHT    325
 #endif /* WPREFS_H_ */
 

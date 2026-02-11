@@ -470,11 +470,7 @@ RImage *get_default_image(WScreen *scr)
 	if (!image)
 		wwarning(_("could not find default icon \"%s\""), path);
 
-	/* Resize the icon to the wPreferences.icon_size size
-	 * usually this function will return early, because size is right */
-	image = wIconValidateIconSize(image, wPreferences.icon_size);
-
-	return image;
+        return image;
 }
 
 RImage *get_icon_image(WScreen *scr, const char *winstance, const char *wclass, int max_size)
