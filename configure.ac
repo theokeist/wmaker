@@ -71,9 +71,9 @@ dnl 6. If any interfaces have been removed or changed since the last
 dnl public release, then set age to 0.
 dnl
 dnl libwraster
-WRASTER_CURRENT=7
+WRASTER_CURRENT=8
 WRASTER_REVISION=0
-WRASTER_AGE=1
+WRASTER_AGE=2
 WRASTER_VERSION=$WRASTER_CURRENT:$WRASTER_REVISION:$WRASTER_AGE
 AC_SUBST(WRASTER_VERSION)
 dnl
@@ -790,6 +790,19 @@ m4_divert_pop([INIT_PREPARE])dnl
 WM_IMGFMT_CHECK_JPEG
 
 
+dnl JXL Support
+dnl ============
+m4_divert_push([INIT_PREPARE])dnl
+AC_ARG_ENABLE([jxl],
+    [AS_HELP_STRING([--disable-jxl], [disable JXL support through libjxl])],
+    [AS_CASE(["$enableval"],
+        [yes|no], [],
+        [AC_MSG_ERROR([bad value $enableval for --enable-jxl])] )],
+    [enable_jxl=auto])
+m4_divert_pop([INIT_PREPARE])dnl
+WM_IMGFMT_CHECK_JXL
+
+
 dnl GIF Support
 dnl ============
 m4_divert_push([INIT_PREPARE])dnl
@@ -890,6 +903,22 @@ AC_SUBST(GFXLIBS)
 AC_SUBST(ICONEXT)
 AM_CONDITIONAL([ICON_EXT_XPM],  [test "x$ICONEXT" = "xxpm"])
 AM_CONDITIONAL([ICON_EXT_TIFF], [test "x$ICONEXT" = "xtiff"])
+
+
+dnl Archive Support for wmiv
+dnl =================================
+dnl Check for libarchive (comprehensive archive support)
+AC_CHECK_LIB([archive], [archive_read_new], [
+    AC_CHECK_HEADER([archive.h], [
+        AC_DEFINE([HAVE_LIBARCHIVE], [1], [Define if libarchive is available])
+        LIBARCHIVE_LIBS="-larchive"
+    ], [
+        AC_MSG_WARN([libarchive header not found, archive support disabled])
+    ])
+], [
+    AC_MSG_WARN([libarchive not found, archive support disabled])
+])
+AC_SUBST([LIBARCHIVE_LIBS])
 
 
 dnl ==============================================

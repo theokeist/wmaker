@@ -38,12 +38,13 @@ typedef enum {
 	IM_PPM     =  4,
 	IM_JPEG    =  5,
 	IM_GIF     =  6,
-	IM_WEBP    =  7
+	IM_WEBP    =  7,
+	IM_JXL     =  8
 } WRImgFormat;
 
 /* How many image types we have. */
 /* Increase this when adding new image types! */
-#define IM_TYPES    7
+#define IM_TYPES    8
 
 /*
  * Function for Loading in a specific format
@@ -62,6 +63,10 @@ RImage *RLoadPNG(RContext *context, const char *file);
 
 #ifdef USE_JPEG
 RImage *RLoadJPEG(const char *file);
+#endif
+
+#ifdef USE_JXL
+RImage *RLoadJXL(const char *file);
 #endif
 
 #ifdef USE_GIF
@@ -85,10 +90,12 @@ Bool RSaveXPM(RImage *image, const char *filename);
 
 #ifdef USE_PNG
 Bool RSavePNG(RImage *image, const char *filename, char *title);
+Bool RSaveRawPNG(RImage *image, char *title, unsigned char **out_buf, size_t *out_size);
 #endif
 
 #ifdef USE_JPEG
 Bool RSaveJPEG(RImage *image, const char *filename, char *title);
+Bool RSaveRawJPEG(RImage *image, char *title, unsigned char **out_buf, size_t *out_size);
 #endif
 
 /*
