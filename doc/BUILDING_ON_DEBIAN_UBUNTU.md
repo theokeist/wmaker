@@ -152,15 +152,20 @@ advice once the build is installed.
 
 ### 4. (Optional) Enable compositor integration
 
-Ubuntu repositories provide several compositors. Install them alongside Window Maker so the Animations & Effects panel can start your selected compositor automatically:
+Ubuntu pulls Picom from the universe repository. Install it alongside Window
+Maker so the Animations & Effects panel can start the compositor automatically:
 
 ```sh
-sudo apt install picom compton xcompmgr compiz
-./configure --prefix=/usr/local --with-compositor=<picom|compton|xcompmgr|compiz|none>
+sudo apt install picom
+./configure --prefix=/usr/local --with-compositor=picom
 ```
 
-After installation, launch WPrefs, switch to **Animations & Effects**, choose your preferred backend (Picom/Compton/Xcompmgr/Compiz), enable **Start compositor automatically** if you want Window Maker
-to launch the selected compositor on login, and toggle **window shadows** to preview the blended minimize/restore paths. The configuration editor in that panel updates template-backed configs (for example `~/.config/picom/picom.conf` or `~/.config/compton.conf`) the first time you open it, and the Mesa packages installed earlier provide the GLX backend Picom/Compton expect.
+After installation, launch WPrefs, switch to **Animations & Effects**, choose the
+Picom entry, enable **Start compositor automatically** if you want Window Maker
+to launch Picom on login, and toggle **window shadows** to preview the blended
+minimize/restore paths. The configuration editor in that panel updates the Picom
+template under `~/.config/picom/picom.conf` the first time you open it, and the
+Mesa packages installed earlier provide the GLX backend Picom expects.
 
 ## Verifying the result
 

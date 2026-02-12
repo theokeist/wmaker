@@ -39,6 +39,45 @@ up. When you run `startx`, the script will start the daemons you listed and then
 hand control to Window Maker. Use absolute paths if your installation lives
 outside the default `$PATH`.
 
+
+### Reuse or replace an existing `~/.xinitrc`
+
+If you already have a `~/.xinitrc`, back it up before switching to Window Maker:
+
+```sh
+cp ~/.xinitrc ~/.xinitrc.before-wmaker
+```
+
+Then choose one of these approaches:
+
+1. **Minimal replacement** (Window Maker only):
+
+```sh
+cat > ~/.xinitrc <<'EOF'
+#!/bin/sh
+exec wmaker
+EOF
+chmod +x ~/.xinitrc
+```
+
+2. **Keep existing startup bits** (keyboard/layout/agent setup) and replace only
+   the final desktop command with `exec wmaker`.
+
+On many systems, this means editing the last line in `~/.xinitrc` from something
+like `exec startplasma-x11`, `exec xfce4-session`, or `exec gnome-session` to
+`exec wmaker`.
+
+If your distribution ships a global xinit helper (for example
+`/etc/X11/xinit/xinitrc`), you can keep that behavior and still end with Window
+Maker:
+
+```sh
+#!/bin/sh
+# optional: keep distro defaults first
+[ -r /etc/X11/xinit/xinitrc.common ] && . /etc/X11/xinit/xinitrc.common
+exec wmaker
+```
+
 ## 3. Add a desktop session entry for a display manager
 
 Modern display managers (GDM, LightDM, SDDM, XDM) look for desktop session

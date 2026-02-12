@@ -98,8 +98,8 @@ static void manageAllWindows(WScreen * scr, int crashed);
 static char *quote_argument(const char *path);
 static char *resolve_config_path(const char *path);
 static void startConfiguredCompositor(void);
-static Bool backend_supports_config(const WCompositorBackend *backend);
-static Bool ensure_backend_config(const WCompositorBackend *backend, const char *path);
+static Bool command_exists(const char *binary);
+static Bool ensure_backend_config(const char *template_name, const char *path);
 
 static int catchXError(Display * dpy, XErrorEvent * error)
 {
@@ -865,7 +865,7 @@ static char *quote_argument(const char *path)
 
         len = 2; /* surrounding quotes */
         for (p = path; *p; p++) {
-                if (*p == '"' || *p == '\\\\')
+                if (*p == '"' || *p == '\\')
                         len += 2;
                 else
                         len++;
@@ -875,8 +875,8 @@ static char *quote_argument(const char *path)
         dst = buffer;
         *dst++ = '"';
         for (p = path; *p; p++) {
-                if (*p == '"' || *p == '\\\\')
-                        *dst++ = '\\\\';
+                if (*p == '"' || *p == '\\')
+                        *dst++ = '\\';
                 *dst++ = *p;
         }
         *dst++ = '"';
@@ -948,20 +948,10 @@ static Bool ensure_backend_config(const char *template_name, const char *path)
         FILE *in;
         FILE *out;
         char *dircopy;
-        int ch;b 
+        int ch;
+        int n;
 
-        if (!backend || !path || !*path)
-                return False;
-
-        if (!backend_supports_config(backend))
-                return False;
-
-        if (backend->choice == WCOMPOSITOR_PICOM)
-                template_name = "picom.conf";
-        else if (backend->choice == WCOMPOSITOR_COMPTON)
-                template_name = "compton.conf";
-
-        if (!template_name)
+        if (!template_name || !*template_name || !path || !*path)
                 return False;
 
         if (stat(path, &st) == 0)
@@ -976,14 +966,23 @@ static Bool ensure_backend_config(const char *template_name, const char *path)
                 wfree(dircopy);
         }
 
-        snprintf(template_path, sizeof(template_path), "%s/Compositors/%s", WMAKER_RESOURCE_PATH, template_name);
+        n = snprintf(template_path, sizeof(template_path), "%s/Compositors/%s",
+                     WMAKER_RESOURCE_PATH, template_name);
+        if (n < 0 || (size_t)n >= sizeof(template_path)) {
+                wwarning(_("template path is too long for compositor %s"), template_name);
+                return False;
+        }
 
         in = fopen(template_path, "r");
         if (!in) {
                 int saved = errno;
 
+                wwarning(_("could not open compositor template %s (%s); creating placeholder at %s"),
+                         template_path, strerror(saved), path);
+
                 out = fopen(path, "w");
                 if (!out) {
+                        saved = errno;
                         wwarning(_("could not create %s: %s"), path, strerror(saved));
                         return False;
                 }
@@ -1010,15 +1009,133 @@ static Bool ensure_backend_config(const char *template_name, const char *path)
         return True;
 }
 
+static const char *compositor_binary_for_choice(int choice)
+{
+        switch (choice) {
+        case WCOMPOSITOR_PICOM:
+                return "picom";
+        case WCOMPOSITOR_COMPTON:
+                return "compton";
+        case WCOMPOSITOR_XCOMPMGR:
+                return "xcompmgr";
+        case WCOMPOSITOR_COMPIZ:
+                return "compiz";
+        default:
+                return NULL;
+        }
+}
+
+static const char *compositor_template_for_choice(int choice)
+{
+        switch (choice) {
+        case WCOMPOSITOR_PICOM:
+                return "picom.conf";
+        case WCOMPOSITOR_COMPTON:
+                return "compton.conf";
+        default:
+                return NULL;
+        }
+}
+
+static Bool prepare_compositor_config_for_choice(int choice, char **expanded_out)
+{
+        const char *template_name;
+        char *expanded;
+
+        if (!expanded_out)
+                return False;
+
+        *expanded_out = NULL;
+
+        template_name = compositor_template_for_choice(choice);
+        if (!template_name)
+                return True;
+
+        if (!wPreferences.compositor_config_path || !wPreferences.compositor_config_path[0])
+                return True;
+
+        expanded = resolve_config_path(wPreferences.compositor_config_path);
+        if (!expanded)
+                return True;
+
+        if (!ensure_backend_config(template_name, expanded)) {
+                wwarning(_("%s configuration %s could not be prepared; launching with defaults."),
+                         template_name, expanded);
+                wfree(expanded);
+                return True;
+        }
+
+        if (access(expanded, R_OK) != 0) {
+                int saved = errno;
+
+                wwarning(_("%s configuration %s is not accessible (%s); launching with defaults."),
+                         template_name, expanded, strerror(saved));
+                wfree(expanded);
+                return True;
+        }
+
+        *expanded_out = expanded;
+        return True;
+}
+
+static Bool build_compositor_command(int choice, const char *quoted_config, char *command, size_t command_size)
+{
+        int n;
+
+        if (!command || command_size == 0)
+                return False;
+
+        command[0] = '\0';
+
+        switch (choice) {
+        case WCOMPOSITOR_PICOM:
+                if (quoted_config) {
+                        n = snprintf(command, command_size,
+                                     "picom --backend glx --config %s --experimental-backends --animations%s",
+                                     quoted_config,
+                                     wPreferences.enable_window_shadows ? " --shadow" : "");
+                } else {
+                        n = snprintf(command, command_size,
+                                     "picom --backend glx --experimental-backends --animations%s",
+                                     wPreferences.enable_window_shadows ? " --shadow" : "");
+                }
+                break;
+
+        case WCOMPOSITOR_COMPTON:
+                if (quoted_config) {
+                        n = snprintf(command, command_size,
+                                     "compton --backend glx --config %s%s",
+                                     quoted_config,
+                                     wPreferences.enable_window_shadows ? " --shadow" : "");
+                } else {
+                        n = snprintf(command, command_size,
+                                     "compton --backend glx%s",
+                                     wPreferences.enable_window_shadows ? " --shadow" : "");
+                }
+                break;
+
+        case WCOMPOSITOR_XCOMPMGR:
+                n = snprintf(command, command_size, "xcompmgr%s",
+                             wPreferences.enable_window_shadows ? " -c" : "");
+                break;
+
+        case WCOMPOSITOR_COMPIZ:
+                n = snprintf(command, command_size, "compiz --replace ccp");
+                break;
+
+        default:
+                return False;
+        }
+
+        return (n >= 0 && (size_t)n < command_size);
+}
+
 static void startConfiguredCompositor(void)
 {
-        const WCompositorBackend *backend;
-        const WCompositorBackend *fallback;
+        const char *binary;
         char command[PATH_MAX * 2];
         char *expanded = NULL;
         char *quoted = NULL;
-
-        command[0] = '\0';
 
         if (!wScreen || w_global.screen_count == 0)
                 return;
@@ -1026,103 +1143,33 @@ static void startConfiguredCompositor(void)
         if (!wPreferences.autostart_compositor)
                 return;
 
-        switch (wPreferences.compositor_choice) {
-        case WCOMPOSITOR_PICOM:
-                if (!command_exists("picom")) {
-                        wwarning(_("Picom compositor selected but not found in PATH; skipping startup."));
-                        break;
-                }
+        if (wPreferences.compositor_choice == WCOMPOSITOR_NONE)
+                return;
 
-                if (wPreferences.compositor_config_path && wPreferences.compositor_config_path[0])
-                        expanded = resolve_config_path(wPreferences.compositor_config_path);
-                if (expanded) {
-                        if (!ensure_backend_config("picom.conf", expanded)) {
-                                wwarning(_("Picom configuration %s could not be prepared; launching with defaults."),
-                                         expanded);
-                                wfree(expanded);
-                                expanded = NULL;
-                        } else if (access(expanded, R_OK) != 0) {
-                                int saved = errno;
-
-                                wwarning(_("Picom configuration %s is not accessible (%s); launching with defaults."),
-                                         expanded, strerror(saved));
-                                wfree(expanded);
-                                expanded = NULL;
-                        }
-                }
-
-                if (expanded)
-                        quoted = quote_argument(expanded);
-                if (quoted)
-                        snprintf(command, sizeof(command),
-                                 "picom --backend glx --config %s --experimental-backends --animations%s",
-                                 quoted,
-                                 wPreferences.enable_window_shadows ? " --shadow" : "");
-                else
-                        snprintf(command, sizeof(command),
-                                 "picom --backend glx --experimental-backends --animations%s",
-                                 wPreferences.enable_window_shadows ? " --shadow" : "");
-                break;
-        case WCOMPOSITOR_COMPTON:
-                if (!command_exists("compton")) {
-                        wwarning(_("Compton compositor selected but not found in PATH; skipping startup."));
-                        break;
-                }
-
-                if (wPreferences.compositor_config_path && wPreferences.compositor_config_path[0])
-                        expanded = resolve_config_path(wPreferences.compositor_config_path);
-                if (expanded) {
-                        if (!ensure_backend_config("compton.conf", expanded)) {
-                                wwarning(_("Compton configuration %s could not be prepared; launching with defaults."),
-                                         expanded);
-                                wfree(expanded);
-                                expanded = NULL;
-                        } else if (access(expanded, R_OK) != 0) {
-                                int saved = errno;
-
-                                wwarning(_("%s configuration %s is not accessible (%s); launching with defaults."),
-                                         backend->name, expanded, strerror(saved));
-                                wfree(expanded);
-                                expanded = NULL;
-                        }
-                }
-
-                if (expanded)
-                        quoted = quote_argument(expanded);
-                if (quoted)
-                        snprintf(command, sizeof(command),
-                                 "compton --backend glx --config %s%s",
-                                 quoted,
-                                 wPreferences.enable_window_shadows ? " --shadow" : "");
-                else
-                        snprintf(command, sizeof(command),
-                                 "compton --backend glx%s",
-                                 wPreferences.enable_window_shadows ? " --shadow" : "");
-                break;
-        case WCOMPOSITOR_XCOMPMGR:
-                if (!command_exists("xcompmgr")) {
-                        wwarning(_("xcompmgr compositor selected but not found in PATH; skipping startup."));
-                        break;
-                }
-                snprintf(command, sizeof(command), "xcompmgr%s",
-                         wPreferences.enable_window_shadows ? " -c" : "");
-                break;
-        case WCOMPOSITOR_COMPIZ:
-                if (!command_exists("compiz")) {
-                        wwarning(_("Compiz compositor selected but not found in PATH; skipping startup."));
-                        break;
-                }
-                snprintf(command, sizeof(command), "compiz --replace ccp");
-                break;
-        default:
-                if (wPreferences.compositor_choice != WCOMPOSITOR_NONE)
-                        wwarning(_("Unknown compositor selection %d; skipping startup."),
-                                 wPreferences.compositor_choice);
+        binary = compositor_binary_for_choice(wPreferences.compositor_choice);
+        if (!binary) {
+                wwarning(_("Unknown compositor selection %d; skipping startup."),
+                         wPreferences.compositor_choice);
                 return;
         }
 
-        if (command[0] != '\0')
+        if (!command_exists(binary)) {
+                wwarning(_("%s compositor selected but not found in PATH; skipping startup."), binary);
+                return;
+        }
+
+        if (!prepare_compositor_config_for_choice(wPreferences.compositor_choice, &expanded))
+                return;
+
+        if (expanded)
+                quoted = quote_argument(expanded);
+
+        if (!build_compositor_command(wPreferences.compositor_choice, quoted,
+                                      command, sizeof(command))) {
+                wwarning(_("Could not build startup command for compositor %s"), binary);
+        } else if (command[0] != '\0') {
                 ExecuteShellCommand(wScreen[0], command);
+        }
 
         if (quoted)
                 wfree(quoted);

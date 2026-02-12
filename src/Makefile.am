@@ -180,7 +180,7 @@ am__v_CHKOPTS_  = $(am__v_CHKOPTS_$(AM_DEFAULT_VERBOSITY))
 am__v_CHKOPTS_0 = @echo "  CHK      $@" ;
 am__v_CHKOPTS_1 =
 
-check-local: defaults-callbacks-static defaults-callbacks-dynamic compositor-integration
+check-local: defaults-callbacks-static defaults-callbacks-dynamic startup-compositor-signature
 
 # Check that the callback functions used to load the configuration match
 # the type of the variable where the value will be stored
@@ -201,5 +201,5 @@ defaults-callbacks-dynamic:
 		--callback "getBool=char, getEnum=char, getInt=int"  \
 		--callback "getPathList=char*, getCoord=WCoord"
 
-compositor-integration:
-	$(AM_V_CHKOPTS)$(top_srcdir)/script/check-compositor-integration.sh
+startup-compositor-signature:
+	$(AM_V_CHKOPTS)$(top_srcdir)/script/check-startup-compositor-signature.sh
