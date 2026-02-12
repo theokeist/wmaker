@@ -50,9 +50,6 @@ WPrefs_SOURCES = \
 	TexturePanel.h \
 	WindowHandling.c \
 	Effects.c \
-	EffectsLayout.c \
-	EffectsSettings.c \
-	EffectsCompositor.c \
 	Workspace.c \
 	double.c \
 	editmenu.c \

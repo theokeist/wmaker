@@ -123,3 +123,6 @@ wmaker --version
 The banner should list support for XPM, PNG, JPEG, TIFF, GIF, and WebP if the
 packages above were installed. For runtime setup and troubleshooting, see
 [`doc/RUNNING_WMAKER.md`](RUNNING_WMAKER.md).
+
+
+> You can choose a different default compositor at configure time with `--with-compositor=compton|xcompmgr|compiz|none`.

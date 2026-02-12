@@ -82,16 +82,25 @@ you want to stage everything under a temporary directory instead, pass
 
 ### 5. (Optional) Wire in compositor defaults and shadows
 
-Window Maker's modern animations rely on an external compositor. Install one or
-more compositor packages and choose a default backend at build time:
+Window Maker's modern animations rely on an external compositor. Install Picom
+and ask `configure` to ship Picom defaults so new users see the effects without
+extra tweaking:
 
 ```sh
-sudo apt install picom compton xcompmgr compiz
-./configure --prefix=/usr/local --with-compositor=<picom|compton|xcompmgr|compiz|none>
+sudo apt install picom
+./configure --prefix=/usr/local --with-compositor=picom
 ```
 
-Picom and Compton templates land in `/usr/local/share/WindowMaker/Compositors/` as `picom.conf` and `compton.conf`.
-After installing, open **WPrefs → Animations & Effects**, pick your preferred compositor, enable **Start compositor automatically** and **window shadows** as desired, and use the **Edit configuration** button for providers with templates (Picom/Compton). Window Maker will create the per-user configuration automatically for those template-backed providers when you select the compositor or launch the editor, and the editor button honours `$VISUAL`, `$EDITOR`, or falls back to `xdg-open` (installable from `xdg-utils`) so the file opens in your system's default text editor. The package list above includes Mesa's GLX components so Picom/Compton presets can use the `glx` backend immediately.
+The Picom template lands in `/usr/local/share/WindowMaker/Compositors/picom.conf`.
+After installing, open **WPrefs → Animations & Effects**, pick **Picom** as the
+preferred compositor, enable **Start compositor automatically** and **window
+shadows** as desired, and use the **Edit configuration** button if you want to
+extend the shipped blur or shadow settings. Window Maker will create the
+per-user Picom configuration automatically when you select the compositor or
+launch the editor, and the editor button honours `$VISUAL`, `$EDITOR`, or falls
+back to `xdg-open` (installable from `xdg-utils`) so the file opens in your
+system's default text editor. The package list above includes Mesa's GLX
+components so the bundled Picom preset can use the `glx` backend immediately.
 
 ## Ubuntu 25.10 (Oracular Oriole)
 
@@ -166,3 +175,6 @@ wmaker --version
 The banner should list `XPM`, `PNG`, `JPEG`, `TIFF`, `GIF`, and `WebP` support if
 the packages above were installed. Use `make check` before installing if you
 want the in-tree self tests to confirm the build on your machine.
+
+
+> You can choose a different default compositor at configure time with `--with-compositor=compton|xcompmgr|compiz|none`.

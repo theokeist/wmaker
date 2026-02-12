@@ -5,7 +5,8 @@ prefsdatadir = $(pkgdatadir)
 wpexecbindir = @wprefs_bindir@
 
 compositordir = $(pkgdatadir)/Compositors
-compositor_DATA = Compositors/picom.conf Compositors/compton.conf
+compositor_DATA = Compositors/picom.conf \
+        Compositors/compton.conf
 
 # menus which need generated to have correct path to WPrefs or data directory
 GENERATED_MENUS =\
@@ -85,7 +86,8 @@ xsessionsdir = @datadir@/xsessions
 xsessions_DATA = wmaker.desktop
 
 EXTRA_DIST = $(addsuffix .in, $(GENERATED_MENUS)) wmaker.desktop \
-        Compositors/picom.conf Compositors/compton.conf
+        Compositors/picom.conf \
+        Compositors/compton.conf
 
 CLEANFILES = $(GENERATED_MENUS)
 
