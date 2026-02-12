@@ -61,6 +61,7 @@
 #include "main.h"
 #include "startup.h"
 #include "dock.h"
+#include "compositor.h"
 #include "workspace.h"
 #include "keybind.h"
 #include "framewin.h"
@@ -97,8 +98,8 @@ static void manageAllWindows(WScreen * scr, int crashed);
 static char *quote_argument(const char *path);
 static char *resolve_config_path(const char *path);
 static void startConfiguredCompositor(void);
-static Bool command_exists(const char *binary);
-static Bool ensure_backend_config(const char *template_name, const char *path);
+static Bool backend_supports_config(const WCompositorBackend *backend);
+static Bool ensure_backend_config(const WCompositorBackend *backend, const char *path);
 
 static int catchXError(Display * dpy, XErrorEvent * error)
 {
@@ -864,7 +865,7 @@ static char *quote_argument(const char *path)
 
         len = 2; /* surrounding quotes */
         for (p = path; *p; p++) {
-                if (*p == '"' || *p == '\\')
+                if (*p == '"' || *p == '\\\\')
                         len += 2;
                 else
                         len++;
@@ -874,8 +875,8 @@ static char *quote_argument(const char *path)
         dst = buffer;
         *dst++ = '"';
         for (p = path; *p; p++) {
-                if (*p == '"' || *p == '\\')
-                        *dst++ = '\\';
+                if (*p == '"' || *p == '\\\\')
+                        *dst++ = '\\\\';
                 *dst++ = *p;
         }
         *dst++ = '"';
@@ -947,9 +948,20 @@ static Bool ensure_backend_config(const char *template_name, const char *path)
         FILE *in;
         FILE *out;
         char *dircopy;
-        int ch;
+        int ch;b 
 
-        if (!template_name || !*template_name || !path || !*path)
+        if (!backend || !path || !*path)
+                return False;
+
+        if (!backend_supports_config(backend))
+                return False;
+
+        if (backend->choice == WCOMPOSITOR_PICOM)
+                template_name = "picom.conf";
+        else if (backend->choice == WCOMPOSITOR_COMPTON)
+                template_name = "compton.conf";
+
+        if (!template_name)
                 return False;
 
         if (stat(path, &st) == 0)
@@ -1000,6 +1012,8 @@ static Bool ensure_backend_config(const char *template_name, const char *path)
 
 static void startConfiguredCompositor(void)
 {
+        const WCompositorBackend *backend;
+        const WCompositorBackend *fallback;
         char command[PATH_MAX * 2];
         char *expanded = NULL;
         char *quoted = NULL;
@@ -1066,8 +1080,8 @@ static void startConfiguredCompositor(void)
                         } else if (access(expanded, R_OK) != 0) {
                                 int saved = errno;
 
-                                wwarning(_("Compton configuration %s is not accessible (%s); launching with defaults."),
-                                         expanded, strerror(saved));
+                                wwarning(_("%s configuration %s is not accessible (%s); launching with defaults."),
+                                         backend->name, expanded, strerror(saved));
                                 wfree(expanded);
                                 expanded = NULL;
                         }
