@@ -6,6 +6,8 @@ wpexecbindir = @wprefs_bindir@
 
 wpexecbin_PROGRAMS = WPrefs
 
+AM_LDFLAGS = $(WMAKER_RUNPATH_FLAGS)
+
 wpdatadir = @wprefs_datadir@
 
 wpdata_DATA = WPrefs.tiff WPrefs.xpm
@@ -46,6 +48,7 @@ WPrefs_SOURCES = \
 	TexturePanel.c \
 	TexturePanel.h \
 	WindowHandling.c \
+	Effects.c \
 	Workspace.c \
 	double.c \
 	editmenu.c \

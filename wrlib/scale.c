@@ -27,11 +27,84 @@
 #include <string.h>
 #include <X11/Xlib.h>
 #include <math.h>
+#include <float.h>
 #include <assert.h>
 
 #include "wraster.h"
 #include "scale.h"
 #include "wr_i18n.h"
+
+
+static void
+set_minimum_dimension(unsigned *value)
+{
+        if (*value == 0)
+                *value = 1;
+}
+
+void RFitImageDimensions(unsigned src_width, unsigned src_height,
+                         unsigned max_width, unsigned max_height,
+                         int allow_upscale, unsigned *dest_width,
+                         unsigned *dest_height)
+{
+        double scale_width;
+        double scale_height;
+        double scale = 1.0;
+
+        if (!dest_width || !dest_height || src_width == 0 || src_height == 0)
+                return;
+
+        if (max_width == 0 && max_height == 0) {
+                *dest_width = src_width;
+                *dest_height = src_height;
+                return;
+        }
+
+        scale_width = (max_width != 0) ? ((double)max_width / (double)src_width) : DBL_MAX;
+        scale_height = (max_height != 0) ? ((double)max_height / (double)src_height) : DBL_MAX;
+
+        scale = (scale_width < scale_height) ? scale_width : scale_height;
+
+        if (!allow_upscale && scale > 1.0)
+                scale = 1.0;
+
+        if (scale == DBL_MAX)
+                scale = 1.0;
+
+        *dest_width = (unsigned)((double)src_width * scale + 0.5);
+        *dest_height = (unsigned)((double)src_height * scale + 0.5);
+
+        set_minimum_dimension(dest_width);
+        set_minimum_dimension(dest_height);
+
+        if (max_width != 0 && *dest_width > max_width)
+                *dest_width = max_width;
+
+        if (max_height != 0 && *dest_height > max_height)
+                *dest_height = max_height;
+}
+
+static RImage *
+scale_image_to_fit(RImage *image, unsigned max_width, unsigned max_height,
+                   int allow_upscale, int smooth)
+{
+        unsigned dest_width = 0;
+        unsigned dest_height = 0;
+
+        if (image == NULL)
+                return NULL;
+
+        if (max_width == 0 && max_height == 0)
+                return RCloneImage(image);
+
+        RFitImageDimensions(image->width, image->height, max_width, max_height,
+                            allow_upscale, &dest_width, &dest_height);
+
+        if (smooth)
+                return RSmoothScaleImage(image, dest_width, dest_height);
+
+        return RScaleImage(image, dest_width, dest_height);
+}
 
 
 /*
@@ -493,7 +566,19 @@ RImage *RSmoothScaleImage(RImage * src, unsigned new_width, unsigned new_height)
 	}
 	free(contrib);
 
-	RReleaseImage(tmp);
+        RReleaseImage(tmp);
 
-	return dst;
+        return dst;
+}
+
+RImage *RScaleImageToFit(RImage *image, unsigned max_width, unsigned max_height,
+                        int allow_upscale)
+{
+        return scale_image_to_fit(image, max_width, max_height, allow_upscale, 0);
+}
+
+RImage *RSmoothScaleImageToFit(RImage *image, unsigned max_width, unsigned max_height,
+                              int allow_upscale)
+{
+        return scale_image_to_fit(image, max_width, max_height, allow_upscale, 1);
 }

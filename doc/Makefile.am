@@ -25,7 +25,9 @@ man_MANS = \
 
 MOSTLYCLEANFILES = wmaker.1 wmsetbg.1
 
-EXTRA_DIST = wmaker.in wmsetbg.in
+EXTRA_DIST = wmaker.in wmsetbg.in RUNNING_WMAKER.md GS_DESKTOP_POLISHING.md \
+GLASS_AND_MODERN_UI_NOTES.md BUILDING_ON_DEBIAN_UBUNTU.md \
+BUILDING_ON_PCLINUXOS_ALT.md
 
 
 ################################################################################

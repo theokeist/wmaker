@@ -160,7 +160,7 @@ void move_window(Window win, int from_x, int from_y, int to_x, int to_y)
 /* wins is an array of Window, sorted from left to right, the first is
  * going to be moved from (from_x,from_y) to (to_x,to_y) and the
  * following windows are going to be offset by (ICON_SIZE*i,0) */
-void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int to_y)
+void slide_windows_with_curve(Window wins[], int n, int from_x, int from_y, int to_x, int to_y, signed char curve)
 {
 	time_t time0 = time(NULL);
 	float dx, dy, x = from_x, y = from_y, px, py;
@@ -182,12 +182,31 @@ void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int t
 		{ICON_SLIDE_DELAY_US, ICON_SLIDE_STEPS_US, ICON_SLIDE_SLOWDOWN_US}
 	};
 
-	slide_slowdown = apars[(int)wPreferences.icon_slide_speed].slowdown;
-	slide_steps = apars[(int)wPreferences.icon_slide_speed].steps;
-	slide_delay = apars[(int)wPreferences.icon_slide_speed].delay;
+        slide_slowdown = apars[(int)wPreferences.icon_slide_speed].slowdown;
+        slide_steps = apars[(int)wPreferences.icon_slide_speed].steps;
+        slide_delay = apars[(int)wPreferences.icon_slide_speed].delay;
 
 	dx_int = to_x - from_x;
 	dy_int = to_y - from_y;
+
+        if (dx_int == 0 && dy_int == 0)
+                return;
+
+        {
+                int distance = WMAX(abs(dx_int), abs(dy_int));
+
+                if (distance < ICON_SIZE) {
+                        slide_steps = WMAX(2, slide_steps / 2);
+                        slide_delay = slide_delay / 2;
+                }
+                if (distance < ICON_SIZE / 2) {
+                        slide_steps = WMAX(1, slide_steps / 3);
+                        slide_delay = slide_delay / 3;
+                }
+        }
+
+        if (slide_steps <= 0)
+                slide_steps = 1;
 	is_dx_nul = (dx_int == 0);
 	is_dy_nul = (dy_int == 0);
 	dx = (float) dx_int;
@@ -197,40 +216,49 @@ void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int t
 		dx_is_bigger = 1;
 	}
 
-	if (dx_is_bigger) {
-		px = dx / slide_slowdown;
-		if (px < slide_steps && px > 0)
-			px = slide_steps;
-		else if (px > -slide_steps && px < 0)
-			px = -slide_steps;
-		py = (is_dx_nul ? 0.0F : px * dy / dx);
+	if (curve < WMEFFECT_CURVE_CLASSIC || curve > WMEFFECT_CURVE_GENTLE)
+		curve = WMEFFECT_CURVE_CLASSIC;
+
+        if (curve != WMEFFECT_CURVE_CLASSIC) {
+                int last_ix = from_x;
+                int last_iy = from_y;
+                int step;
+
+                for (step = 1; step <= slide_steps; step++) {
+			double progress = (double)step / (double)slide_steps;
+			double eased = REffectProgressForCurve((REffectCurve)curve, progress);
+			double target_x = from_x + dx * eased;
+			double target_y = from_y + dy * eased;
+			int ix = (int)(target_x >= 0.0 ? target_x + 0.5 : target_x - 0.5);
+			int iy = (int)(target_y >= 0.0 ? target_y + 0.5 : target_y - 0.5);
+
+			if (ix == last_ix && iy == last_iy)
+				continue;
+
+			for (i = 0; i < n; i++)
+				XMoveWindow(dpy, wins[i], ix + i * ICON_SIZE, iy);
+			XFlush(dpy);
+			if (slide_delay > 0)
+				wusleep(slide_delay * 1000L);
+			else
+				wusleep(1000L);
+
+			if (time(NULL) - time0 > MAX_ANIMATION_TIME)
+				break;
+
+			last_ix = ix;
+			last_iy = iy;
+		}
 	} else {
-		py = dy / slide_slowdown;
-		if (py < slide_steps && py > 0)
-			py = slide_steps;
-		else if (py > -slide_steps && py < 0)
-			py = -slide_steps;
-		px = (is_dy_nul ? 0.0F : py * dx / dy);
-	}
-
-	while (((int)x) != to_x ||
-			 ((int)y) != to_y) {
-		x += px;
-		y += py;
-		if ((px < 0 && (int)x < to_x) || (px > 0 && (int)x > to_x))
-			x = (float)to_x;
-		if ((py < 0 && (int)y < to_y) || (py > 0 && (int)y > to_y))
-			y = (float)to_y;
-
 		if (dx_is_bigger) {
-			px = px * (1.0F - 1 / (float)slide_slowdown);
+			px = dx / slide_slowdown;
 			if (px < slide_steps && px > 0)
 				px = slide_steps;
 			else if (px > -slide_steps && px < 0)
 				px = -slide_steps;
 			py = (is_dx_nul ? 0.0F : px * dy / dx);
 		} else {
-			py = py * (1.0F - 1 / (float)slide_slowdown);
+			py = dy / slide_slowdown;
 			if (py < slide_steps && py > 0)
 				py = slide_steps;
 			else if (py > -slide_steps && py < 0)
@@ -238,17 +266,43 @@ void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int t
 			px = (is_dy_nul ? 0.0F : py * dx / dy);
 		}
 
-		for (i = 0; i < n; i++) {
-			XMoveWindow(dpy, wins[i], (int)x + i * ICON_SIZE, (int)y);
+		while (((int)x) != to_x ||
+				 ((int)y) != to_y) {
+			x += px;
+			y += py;
+			if ((px < 0 && (int)x < to_x) || (px > 0 && (int)x > to_x))
+				x = (float)to_x;
+			if ((py < 0 && (int)y < to_y) || (py > 0 && (int)y > to_y))
+				y = (float)to_y;
+
+			if (dx_is_bigger) {
+				px = px * (1.0F - 1 / (float)slide_slowdown);
+				if (px < slide_steps && px > 0)
+					px = slide_steps;
+				else if (px > -slide_steps && px < 0)
+					px = -slide_steps;
+				py = (is_dx_nul ? 0.0F : px * dy / dx);
+			} else {
+				py = py * (1.0F - 1 / (float)slide_slowdown);
+				if (py < slide_steps && py > 0)
+					py = slide_steps;
+				else if (py > -slide_steps && py < 0)
+					py = -slide_steps;
+				px = (is_dy_nul ? 0.0F : py * dx / dy);
+			}
+
+			for (i = 0; i < n; i++) {
+				XMoveWindow(dpy, wins[i], (int)x + i * ICON_SIZE, (int)y);
+			}
+			XFlush(dpy);
+			if (slide_delay > 0) {
+				wusleep(slide_delay * 1000L);
+			} else {
+				wusleep(1000L);
+			}
+			if (time(NULL) - time0 > MAX_ANIMATION_TIME)
+				break;
 		}
-		XFlush(dpy);
-		if (slide_delay > 0) {
-			wusleep(slide_delay * 1000L);
-		} else {
-			wusleep(1000L);
-		}
-		if (time(NULL) - time0 > MAX_ANIMATION_TIME)
-			break;
 	}
 	for (i = 0; i < n; i++) {
 		XMoveWindow(dpy, wins[i], to_x + i * ICON_SIZE, to_y);
@@ -257,6 +311,12 @@ void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int t
 	XSync(dpy, 0);
 	/* compress expose events */
 	eatExpose();
+}
+
+void slide_windows(Window wins[], int n, int from_x, int from_y, int to_x, int to_y)
+{
+	slide_windows_with_curve(wins, n, from_x, from_y, to_x, to_y,
+	                         wPreferences.window_movement_effect);
 }
 
 char *ShrinkString(WMFont *font, const char *string, int width)
@@ -515,8 +575,8 @@ char *ExpandOptions(WScreen *scr, const char *cmdline)
 	char *out, *nout;
 	char *selection = NULL;
 	char *user_input = NULL;
-	char tmpbuf[TMPBUFSIZE];
-	int slen;
+        char tmpbuf[TMPBUFSIZE];
+        int slen;
 
 	len = strlen(cmdline);
 	olen = len + 1;
@@ -661,10 +721,61 @@ char *ExpandOptions(WScreen *scr, const char *cmdline)
 				optr += slen;
 				break;
 
-			default:
-				out[optr++] = '%';
-				out[optr++] = cmdline[ptr];
-			}
+                        case 'u':
+                        case 'U':
+                        case 'f':
+                        case 'F':
+                        {
+                                const char *payload = NULL;
+                                int anchor = optr;
+#define TRIM_TRAILING_SPACE()                                                      \
+        do {                                                                       \
+                while (optr > 0 && (out[optr - 1] == ' ' || out[optr - 1] == '\t')) { \
+                        optr--;                                                     \
+                        out[optr] = '\0';                                          \
+                }                                                                  \
+        } while (0)
+#ifdef USE_DOCK_XDND
+                                if ((cmdline[ptr] == 'F' || cmdline[ptr] == 'U') && scr->xdestring && scr->xdestring[0])
+                                        payload = scr->xdestring;
+#endif
+                                if (!payload) {
+                                        if (!selection)
+                                                selection = getselection(scr);
+                                        payload = selection;
+                                }
+
+                                if (payload && payload[0]) {
+                                        slen = strlen(payload);
+                                        olen += slen;
+                                        nout = realloc(out, olen);
+                                        if (!nout) {
+                                                tmpbuf[0] = '%';
+                                                tmpbuf[1] = cmdline[ptr];
+                                                tmpbuf[2] = '\0';
+                                                wwarning(_("out of memory during expansion of '%s' for command \"%s\""), tmpbuf, cmdline);
+                                                goto error;
+                                        }
+                                        out = nout;
+                                        strcat(out, payload);
+                                        optr += slen;
+                                } else {
+                                        TRIM_TRAILING_SPACE();
+                                        while (optr > anchor && (out[optr - 1] == '_' || out[optr - 1] == '-' ||
+                                                                 out[optr - 1] == '=' || out[optr - 1] == '.')) {
+                                                optr--;
+                                                out[optr] = '\0';
+                                        }
+                                }
+                                /* macro only used within this scope */
+#undef TRIM_TRAILING_SPACE
+                                break;
+                        }
+
+                        default:
+                                out[optr++] = '%';
+                                out[optr++] = cmdline[ptr];
+                        }
 			break;
 		}
 		out[optr] = 0;

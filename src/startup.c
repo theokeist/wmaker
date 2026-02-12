@@ -27,10 +27,13 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #ifdef __FreeBSD__
 #include <sys/signal.h>
 #endif
+#include <limits.h>
+#include <libgen.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xresource.h>
@@ -73,6 +76,7 @@
 #endif
 
 #include "xutil.h"
+#include <WINGs/WUtil.h>
 
 /* for SunOS */
 #ifndef SA_RESTART
@@ -89,6 +93,12 @@ static WScreen **wScreen = NULL;
 static unsigned int _NumLockMask = 0;
 static unsigned int _ScrollLockMask = 0;
 static void manageAllWindows(WScreen * scr, int crashed);
+
+static char *quote_argument(const char *path);
+static char *resolve_config_path(const char *path);
+static void startConfiguredCompositor(void);
+static Bool command_exists(const char *binary);
+static Bool ensure_backend_config(const char *template_name, const char *path);
 
 static int catchXError(Display * dpy, XErrorEvent * error)
 {
@@ -708,6 +718,8 @@ void StartUp(Bool defaultScreenOnly)
 		Exit(1);
 	}
 
+	startConfiguredCompositor();
+
 #ifndef HAVE_INOTIFY
 	/* setup defaults file polling */
 	if (!wPreferences.flags.noupdates)
@@ -838,4 +850,328 @@ static void manageAllWindows(WScreen * scr, int crashRecovery)
 	if (!wPreferences.flags.noclip)
 		wDockShowIcons(scr->workspaces[scr->current_workspace]->clip);
 	scr->flags.startup2 = 0;
+}
+
+static char *quote_argument(const char *path)
+{
+        const char *p;
+        size_t len;
+        char *buffer;
+        char *dst;
+
+        if (!path)
+                return NULL;
+
+        len = 2; /* surrounding quotes */
+        for (p = path; *p; p++) {
+                if (*p == '"' || *p == '\\')
+                        len += 2;
+                else
+                        len++;
+        }
+
+        buffer = wmalloc(len + 1);
+        dst = buffer;
+        *dst++ = '"';
+        for (p = path; *p; p++) {
+                if (*p == '"' || *p == '\\')
+                        *dst++ = '\\';
+                *dst++ = *p;
+        }
+        *dst++ = '"';
+        *dst = '\0';
+
+        return buffer;
+}
+
+static char *resolve_config_path(const char *path)
+{
+        char *expanded;
+
+        if (!path || !*path)
+                return NULL;
+
+        expanded = wexpandpath(path);
+        if (!expanded)
+                return NULL;
+
+        if (!*expanded) {
+                wfree(expanded);
+                return NULL;
+        }
+
+        return expanded;
+}
+
+static Bool command_exists(const char *binary)
+{
+        const char *path_env;
+        char *paths;
+        char *token;
+        Bool result = False;
+
+        if (!binary || !*binary)
+                return False;
+
+        if (strchr(binary, '/'))
+                return access(binary, X_OK) == 0;
+
+        path_env = getenv("PATH");
+        if (!path_env || !*path_env)
+                return False;
+
+        paths = wstrdup(path_env);
+        for (token = strtok(paths, ":"); token; token = strtok(NULL, ":")) {
+                const char *dir = (*token) ? token : ".";
+                size_t len = strlen(dir) + strlen(binary) + 2;
+                char *candidate = wmalloc(len);
+
+                snprintf(candidate, len, "%s/%s", dir, binary);
+                if (access(candidate, X_OK) == 0) {
+                        result = True;
+                        wfree(candidate);
+                        break;
+                }
+                wfree(candidate);
+        }
+
+        wfree(paths);
+
+        return result;
+}
+
+static Bool ensure_backend_config(const char *template_name, const char *path)
+{
+        struct stat st;
+        char template_path[PATH_MAX];
+        FILE *in;
+        FILE *out;
+        char *dircopy;
+        int ch;
+        int n;
+
+        if (!template_name || !*template_name || !path || !*path)
+                return False;
+
+        if (stat(path, &st) == 0)
+                return True;
+
+        dircopy = wstrdup(path);
+        if (dircopy) {
+                char *dirpath = dirname(dircopy);
+
+                if (dirpath && *dirpath)
+                        wmkdirhier(dirpath);
+                wfree(dircopy);
+        }
+
+        n = snprintf(template_path, sizeof(template_path), "%s/Compositors/%s",
+                     WMAKER_RESOURCE_PATH, template_name);
+        if (n < 0 || (size_t)n >= sizeof(template_path)) {
+                wwarning(_("template path is too long for compositor %s"), template_name);
+                return False;
+        }
+
+        in = fopen(template_path, "r");
+        if (!in) {
+                int saved = errno;
+
+                wwarning(_("could not open compositor template %s (%s); creating placeholder at %s"),
+                         template_path, strerror(saved), path);
+
+                out = fopen(path, "w");
+                if (!out) {
+                        saved = errno;
+                        wwarning(_("could not create %s: %s"), path, strerror(saved));
+                        return False;
+                }
+
+                fprintf(out, "# Window Maker compositor configuration placeholder\n");
+                fclose(out);
+                return True;
+        }
+
+        out = fopen(path, "w");
+        if (!out) {
+                int saved = errno;
+
+                fclose(in);
+                wwarning(_("could not write %s: %s"), path, strerror(saved));
+                return False;
+        }
+
+        while ((ch = fgetc(in)) != EOF)
+                fputc(ch, out);
+
+        fclose(in);
+        fclose(out);
+        return True;
+}
+
+static const char *compositor_binary_for_choice(int choice)
+{
+        switch (choice) {
+        case WCOMPOSITOR_PICOM:
+                return "picom";
+        case WCOMPOSITOR_COMPTON:
+                return "compton";
+        case WCOMPOSITOR_XCOMPMGR:
+                return "xcompmgr";
+        case WCOMPOSITOR_COMPIZ:
+                return "compiz";
+        default:
+                return NULL;
+        }
+}
+
+static const char *compositor_template_for_choice(int choice)
+{
+        switch (choice) {
+        case WCOMPOSITOR_PICOM:
+                return "picom.conf";
+        case WCOMPOSITOR_COMPTON:
+                return "compton.conf";
+        default:
+                return NULL;
+        }
+}
+
+static Bool prepare_compositor_config_for_choice(int choice, char **expanded_out)
+{
+        const char *template_name;
+        char *expanded;
+
+        if (!expanded_out)
+                return False;
+
+        *expanded_out = NULL;
+
+        template_name = compositor_template_for_choice(choice);
+        if (!template_name)
+                return True;
+
+        if (!wPreferences.compositor_config_path || !wPreferences.compositor_config_path[0])
+                return True;
+
+        expanded = resolve_config_path(wPreferences.compositor_config_path);
+        if (!expanded)
+                return True;
+
+        if (!ensure_backend_config(template_name, expanded)) {
+                wwarning(_("%s configuration %s could not be prepared; launching with defaults."),
+                         template_name, expanded);
+                wfree(expanded);
+                return True;
+        }
+
+        if (access(expanded, R_OK) != 0) {
+                int saved = errno;
+
+                wwarning(_("%s configuration %s is not accessible (%s); launching with defaults."),
+                         template_name, expanded, strerror(saved));
+                wfree(expanded);
+                return True;
+        }
+
+        *expanded_out = expanded;
+        return True;
+}
+
+static Bool build_compositor_command(int choice, const char *quoted_config, char *command, size_t command_size)
+{
+        int n;
+
+        if (!command || command_size == 0)
+                return False;
+
+        command[0] = '\0';
+
+        switch (choice) {
+        case WCOMPOSITOR_PICOM:
+                if (quoted_config) {
+                        n = snprintf(command, command_size,
+                                     "picom --backend glx --config %s --experimental-backends --animations%s",
+                                     quoted_config,
+                                     wPreferences.enable_window_shadows ? " --shadow" : "");
+                } else {
+                        n = snprintf(command, command_size,
+                                     "picom --backend glx --experimental-backends --animations%s",
+                                     wPreferences.enable_window_shadows ? " --shadow" : "");
+                }
+                break;
+
+        case WCOMPOSITOR_COMPTON:
+                if (quoted_config) {
+                        n = snprintf(command, command_size,
+                                     "compton --backend glx --config %s%s",
+                                     quoted_config,
+                                     wPreferences.enable_window_shadows ? " --shadow" : "");
+                } else {
+                        n = snprintf(command, command_size,
+                                     "compton --backend glx%s",
+                                     wPreferences.enable_window_shadows ? " --shadow" : "");
+                }
+                break;
+
+        case WCOMPOSITOR_XCOMPMGR:
+                n = snprintf(command, command_size, "xcompmgr%s",
+                             wPreferences.enable_window_shadows ? " -c" : "");
+                break;
+
+        case WCOMPOSITOR_COMPIZ:
+                n = snprintf(command, command_size, "compiz --replace ccp");
+                break;
+
+        default:
+                return False;
+        }
+
+        return (n >= 0 && (size_t)n < command_size);
+}
+
+static void startConfiguredCompositor(void)
+{
+        const char *binary;
+        char command[PATH_MAX * 2];
+        char *expanded = NULL;
+        char *quoted = NULL;
+
+        if (!wScreen || w_global.screen_count == 0)
+                return;
+
+        if (!wPreferences.autostart_compositor)
+                return;
+
+        if (wPreferences.compositor_choice == WCOMPOSITOR_NONE)
+                return;
+
+        binary = compositor_binary_for_choice(wPreferences.compositor_choice);
+        if (!binary) {
+                wwarning(_("Unknown compositor selection %d; skipping startup."),
+                         wPreferences.compositor_choice);
+                return;
+        }
+
+        if (!command_exists(binary)) {
+                wwarning(_("%s compositor selected but not found in PATH; skipping startup."), binary);
+                return;
+        }
+
+        if (!prepare_compositor_config_for_choice(wPreferences.compositor_choice, &expanded))
+                return;
+
+        if (expanded)
+                quoted = quote_argument(expanded);
+
+        if (!build_compositor_command(wPreferences.compositor_choice, quoted,
+                                      command, sizeof(command))) {
+                wwarning(_("Could not build startup command for compositor %s"), binary);
+        } else if (command[0] != '\0') {
+                ExecuteShellCommand(wScreen[0], command);
+        }
+
+        if (quoted)
+                wfree(quoted);
+        if (expanded)
+                wfree(expanded);
 }

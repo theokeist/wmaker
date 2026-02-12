@@ -1,5 +1,7 @@
 AUTOMAKE_OPTIONS =
 
+AM_LDFLAGS = $(WMAKER_RUNPATH_FLAGS)
+
 BUILT_SOURCES = wconfig.h
 
 bin_PROGRAMS = wmaker
@@ -151,9 +153,10 @@ endif
 AM_CFLAGS = @PANGO_CFLAGS@
 
 AM_CPPFLAGS = $(DFLAGS) \
-	-I$(top_builddir)/wrlib \
-	-I$(top_srcdir)/WINGs -I$(top_builddir)/WINGs \
-	@HEADER_SEARCH_PATH@
+        -DWMAKER_RESOURCE_PATH=\"$(pkgdatadir)\" \
+        -I$(top_builddir)/wrlib \
+        -I$(top_srcdir)/WINGs -I$(top_builddir)/WINGs \
+        @HEADER_SEARCH_PATH@
 
 
 wmaker_LDADD = \
@@ -175,7 +178,7 @@ am__v_CHKOPTS_  = $(am__v_CHKOPTS_$(AM_DEFAULT_VERBOSITY))
 am__v_CHKOPTS_0 = @echo "  CHK      $@" ;
 am__v_CHKOPTS_1 =
 
-check-local: defaults-callbacks-static defaults-callbacks-dynamic
+check-local: defaults-callbacks-static defaults-callbacks-dynamic startup-compositor-signature
 
 # Check that the callback functions used to load the configuration match
 # the type of the variable where the value will be stored
@@ -195,3 +198,6 @@ defaults-callbacks-dynamic:
 		--struct-def "legacy_minipreview_config=$(srcdir)/defaults.c"  \
 		--callback "getBool=char, getEnum=char, getInt=int"  \
 		--callback "getPathList=char*, getCoord=WCoord"
+
+startup-compositor-signature:
+	$(AM_V_CHKOPTS)$(top_srcdir)/script/check-startup-compositor-signature.sh

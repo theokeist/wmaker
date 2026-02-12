@@ -338,25 +338,31 @@ void wIconChangeTitle(WIcon *icon, WWindow *wwin)
 
 RImage *wIconValidateIconSize(RImage *icon, int max_size)
 {
-	RImage *nimage;
+        RImage *scaled;
+        int target_size;
 
-	if (!icon)
-		return NULL;
+        if (!icon)
+                return NULL;
 
-	/* We should hold "ICON_BORDER" (~2) pixels to include the icon border */
-	if (((max_size + ICON_BORDER) < icon->width) ||
-	    ((max_size + ICON_BORDER) < icon->height)) {
-		if (icon->width > icon->height)
-			nimage = RScaleImage(icon, max_size - ICON_BORDER,
-					     (icon->height * (max_size - ICON_BORDER) / icon->width));
-		else
-			nimage = RScaleImage(icon, (icon->width * (max_size - ICON_BORDER) / icon->height),
-					     max_size - ICON_BORDER);
-		RReleaseImage(icon);
-		icon = nimage;
-	}
+        /* Keep room for the icon border and clamp to a sane minimum. */
+        if (max_size <= ICON_BORDER)
+                max_size = ICON_BORDER + 1;
 
-	return icon;
+        target_size = max_size - ICON_BORDER;
+        if (target_size <= 0)
+                target_size = 1;
+
+        if (icon->width > target_size || icon->height > target_size)
+                scaled = RSmoothScaleImageToFit(icon, target_size, target_size, False);
+        else
+                scaled = RScaleImageToFit(icon, target_size, target_size, False);
+        if (!scaled)
+                return icon;
+
+        if (scaled != icon)
+                RReleaseImage(icon);
+
+        return scaled;
 }
 
 int wIconChangeImageFile(WIcon *icon, const char *file)
@@ -619,8 +625,9 @@ void set_icon_minipreview(WIcon *icon, RImage *image)
 	RImage *scaled_mini_preview;
 	WScreen *scr = icon->core->screen_ptr;
 
-	scaled_mini_preview = RSmoothScaleImage(image, wPreferences.minipreview_size - 2 * MINIPREVIEW_BORDER,
-	                                  wPreferences.minipreview_size - 2 * MINIPREVIEW_BORDER);
+		scaled_mini_preview = RSmoothScaleImageToFit(image,
+			wPreferences.minipreview_size - 2 * MINIPREVIEW_BORDER,
+			wPreferences.minipreview_size - 2 * MINIPREVIEW_BORDER, True);
 
 	if (RConvertImage(scr->rcontext, scaled_mini_preview, &tmp)) {
 		if (icon->mini_preview != None)

@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <WINGs/WINGs.h>
+#include <wraster.h>
 
 
 /* class codes */
@@ -159,8 +160,9 @@ typedef enum {
 #define WIS_ZOOM        0
 #define WIS_TWIST       1
 #define WIS_FLIP        2
-#define WIS_NONE        3
-#define WIS_RANDOM	4 /* secret */
+#define WIS_GLIDE       3
+#define WIS_NONE        4
+#define WIS_RANDOM	5 /* secret */
 
 /* switchmenu actions */
 #define ACTION_ADD		0
@@ -176,6 +178,20 @@ typedef enum {
 #define SPEED_MEDIUM	2
 #define SPEED_SLOW	3
 #define SPEED_ULTRASLOW 4
+
+
+/* animation curves */
+#define WMEFFECT_CURVE_CLASSIC R_EFFECT_CURVE_CLASSIC
+#define WMEFFECT_CURVE_SMOOTH  R_EFFECT_CURVE_SMOOTH
+#define WMEFFECT_CURVE_GENTLE  R_EFFECT_CURVE_GENTLE
+
+typedef enum {
+        WCOMPOSITOR_NONE = 0,
+        WCOMPOSITOR_PICOM,
+        WCOMPOSITOR_COMPTON,
+        WCOMPOSITOR_XCOMPMGR,
+        WCOMPOSITOR_COMPIZ
+} WCompositorChoice;
 
 
 /* window states */
@@ -431,14 +447,24 @@ extern struct WPreferences {
 	/* some constants */
 	int dblclick_time;                 /* double click delay time in ms */
 
-	/* animate menus */
-	signed char menu_scroll_speed;     /* how fast menus are scrolled */
+        /* animate menus */
+        signed char menu_scroll_speed;     /* how fast menus are scrolled */
 
-	/* animate icon sliding */
-	signed char icon_slide_speed;      /* icon slide animation speed */
+        /* animate icon sliding */
+        signed char icon_slide_speed;      /* icon slide animation speed */
 
-	/* shading animation */
-	signed char shade_speed;
+        /* transition curves */
+        signed char window_movement_effect;
+        signed char launch_effect;
+        char show_window_contents_in_animations;
+        signed char compositor_choice;
+        char *compositor_config_path;
+        char enable_window_shadows;
+        char autostart_compositor;
+        int dock_opacity;              /* opacity of dock icons [0..100] */
+
+        /* shading animation */
+        signed char shade_speed;
 
 	/* bouncing animation */
 	char bounce_appicons_when_urgent;
