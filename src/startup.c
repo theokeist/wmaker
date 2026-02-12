@@ -61,6 +61,7 @@
 #include "main.h"
 #include "startup.h"
 #include "dock.h"
+#include "compositor.h"
 #include "workspace.h"
 #include "keybind.h"
 #include "framewin.h"
