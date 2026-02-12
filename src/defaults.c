@@ -244,7 +244,9 @@ static WOptionEnumeration seTransitionEffects[] = {
 static WOptionEnumeration seCompositors[] = {
         {"None", WCOMPOSITOR_NONE, 0},
         {"Picom", WCOMPOSITOR_PICOM, 0},
-        {"Compiz", WCOMPOSITOR_NONE, 1},
+        {"Compton", WCOMPOSITOR_COMPTON, 0},
+        {"Xcompmgr", WCOMPOSITOR_XCOMPMGR, 0},
+        {"Compiz", WCOMPOSITOR_COMPIZ, 0},
         {NULL, 0, 0},
 };
 

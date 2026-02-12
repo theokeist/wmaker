@@ -82,7 +82,10 @@ static const struct {
         const char *default_path;
 } compositor_options[] = {
         { "None",  N_("No compositor (classic look)"), "" },
-        { "Picom", N_("Picom (lightweight effects)"), "~/.config/picom/picom.conf" }
+        { "Picom", N_("Picom (lightweight effects)"), "~/.config/picom/picom.conf" },
+        { "Compton", N_("Compton (legacy fork)"), "~/.config/compton.conf" },
+        { "Xcompmgr", N_("xcompmgr (basic compositor)"), "" },
+        { "Compiz", N_("Compiz (plugin compositor)"), "" }
 };
 
 static Bool command_exists(const char *binary)
@@ -168,6 +171,34 @@ static const char *default_path_for_index(int index)
 
         return compositor_options[index].default_path;
 }
+static Bool compositor_index_is_none(int index)
+{
+        return (index < 0 || index >= (int)wlengthof(compositor_options)
+                || strcasecmp(compositor_options[index].db_value, "None") == 0);
+}
+
+static Bool compositor_index_supports_config(int index)
+{
+        if (index < 0 || index >= (int)wlengthof(compositor_options))
+                return False;
+
+        return (strcasecmp(compositor_options[index].db_value, "Picom") == 0
+                || strcasecmp(compositor_options[index].db_value, "Compton") == 0);
+}
+
+static const char *template_name_for_index(int index)
+{
+        if (index < 0 || index >= (int)wlengthof(compositor_options))
+                return NULL;
+
+        if (strcasecmp(compositor_options[index].db_value, "Picom") == 0)
+                return "picom.conf";
+        if (strcasecmp(compositor_options[index].db_value, "Compton") == 0)
+                return "compton.conf";
+
+        return NULL;
+}
+
 
 static void free_config_path(_Panel *panel)
 {
@@ -186,7 +217,7 @@ static void set_config_path(_Panel *panel, const char *path)
 
 static void syncCompositorControls(_Panel *panel)
 {
-        Bool hasCompositor = (panel->compositorIndex == 1);
+        Bool hasCompositor = !compositor_index_is_none(panel->compositorIndex);
 
         if (panel->shadowB)
                 WMSetButtonEnabled(panel->shadowB, hasCompositor);
@@ -197,13 +228,13 @@ static void syncCompositorControls(_Panel *panel)
 
 static void updateConfigPathLabel(_Panel *panel)
 {
-        Bool hasPicom = (panel->compositorIndex == 1);
-        Bool hasConfig = (hasPicom && panel->configPath && panel->configPath[0] != '\0');
+        Bool hasConfigBackend = compositor_index_supports_config(panel->compositorIndex);
+        Bool hasConfig = (hasConfigBackend && panel->configPath && panel->configPath[0] != '\0');
 
-        if (!hasPicom) {
+        if (!hasConfigBackend) {
                 WMSetLabelText(panel->configPathL, _("No compositor configuration in use"));
         } else if (!hasConfig) {
-                WMSetLabelText(panel->configPathL, _("Picom configuration will be created on demand"));
+                WMSetLabelText(panel->configPathL, _("Compositor configuration will be created on demand"));
         } else {
                 WMSetLabelText(panel->configPathL, panel->configPath);
         }
@@ -269,7 +300,7 @@ static int ensure_config_template(int index, const char *path)
         FILE *in, *out;
         int c;
 
-        if (!path || index != 1)
+        if (!path || !compositor_index_supports_config(index))
                 return -1;
 
         if (stat(path, &st) == 0)
@@ -281,7 +312,9 @@ static int ensure_config_template(int index, const char *path)
                 wmkdirhier(dirpath);
         wfree(dircopy);
 
-        template_name = "picom.conf";
+        template_name = template_name_for_index(index);
+        if (!template_name)
+                return -1;
         snprintf(template_path, sizeof(template_path), "%s/Compositors/%s", WMAKER_RESOURCE_PATH, template_name);
 
         in = fopen(template_path, "r");
@@ -315,7 +348,7 @@ static void ensure_template_for_selection(_Panel *panel)
 {
         char *expanded;
 
-        if (!panel || panel->compositorIndex != 1 || !panel->configPath)
+        if (!panel || !compositor_index_supports_config(panel->compositorIndex) || !panel->configPath)
                 return;
 
         expanded = wexpandpath(panel->configPath);
@@ -412,7 +445,7 @@ static void showData(_Panel *panel)
         str = GetStringForKey("CompositorConfigPath");
         if (!str || !str[0])
                 str = default_path_for_index(index);
-        if (index == 1)
+        if (compositor_index_supports_config(index))
                 set_config_path(panel, str);
         else
                 set_config_path(panel, NULL);
@@ -436,7 +469,7 @@ static void storeData(_Panel *panel)
 
         SetStringForKey(compositor_options[compositor_index].db_value, "PreferredCompositor");
         SetBoolForKey(WMGetButtonSelected(panel->autostartB), "AutostartCompositor");
-        if (panel->configPath && panel->compositorIndex == 1)
+        if (panel->configPath && compositor_index_supports_config(panel->compositorIndex))
                 SetStringForKey(panel->configPath, "CompositorConfigPath");
         else
                 RemoveObjectForKey("CompositorConfigPath");
@@ -469,7 +502,7 @@ static void compositorChanged(WMWidget *w, void *data)
 
         if (index != panel->compositorIndex) {
                 default_path = default_path_for_index(index);
-                if (index == 1)
+                if (compositor_index_supports_config(index))
                         set_config_path(panel, default_path);
                 else
                         set_config_path(panel, NULL);
@@ -774,7 +807,7 @@ static void createPanel(Panel *p)
         WMMoveWidget(panel->hintL, 180, 80);
         WMSetLabelWraps(panel->hintL, True);
         WMSetLabelText(panel->hintL,
-                       _("Picom pairs well with the Glide minimize effect and provides soft shadows when enabled. "
+                       _("Picom or Compton pair well with the Glide minimize effect and provide soft shadows when enabled. "
                          "Window Maker falls back to classic animations if no compositor is active."));
 
         WMRealizeWidget(panel->box);

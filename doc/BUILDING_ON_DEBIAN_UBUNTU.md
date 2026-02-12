@@ -180,3 +180,6 @@ wmaker --version
 The banner should list `XPM`, `PNG`, `JPEG`, `TIFF`, `GIF`, and `WebP` support if
 the packages above were installed. Use `make check` before installing if you
 want the in-tree self tests to confirm the build on your machine.
+
+
+> You can choose a different default compositor at configure time with `--with-compositor=compton|xcompmgr|compiz|none`.

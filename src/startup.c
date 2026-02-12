@@ -98,7 +98,7 @@ static char *quote_argument(const char *path);
 static char *resolve_config_path(const char *path);
 static void startConfiguredCompositor(void);
 static Bool command_exists(const char *binary);
-static Bool ensure_picom_config(const char *path);
+static Bool ensure_backend_config(const char *template_name, const char *path);
 
 static int catchXError(Display * dpy, XErrorEvent * error)
 {
@@ -940,17 +940,16 @@ static Bool command_exists(const char *binary)
         return result;
 }
 
-static Bool ensure_picom_config(const char *path)
+static Bool ensure_backend_config(const char *template_name, const char *path)
 {
         struct stat st;
         char template_path[PATH_MAX];
-        const char *template_name = "picom.conf";
         FILE *in;
         FILE *out;
         char *dircopy;
         int ch;
 
-        if (!path || !*path)
+        if (!template_name || !*template_name || !path || !*path)
                 return False;
 
         if (stat(path, &st) == 0)
@@ -1023,7 +1022,7 @@ static void startConfiguredCompositor(void)
                 if (wPreferences.compositor_config_path && wPreferences.compositor_config_path[0])
                         expanded = resolve_config_path(wPreferences.compositor_config_path);
                 if (expanded) {
-                        if (!ensure_picom_config(expanded)) {
+                        if (!ensure_backend_config("picom.conf", expanded)) {
                                 wwarning(_("Picom configuration %s could not be prepared; launching with defaults."),
                                          expanded);
                                 wfree(expanded);
@@ -1049,6 +1048,57 @@ static void startConfiguredCompositor(void)
                         snprintf(command, sizeof(command),
                                  "picom --backend glx --experimental-backends --animations%s",
                                  wPreferences.enable_window_shadows ? " --shadow" : "");
+                break;
+        case WCOMPOSITOR_COMPTON:
+                if (!command_exists("compton")) {
+                        wwarning(_("Compton compositor selected but not found in PATH; skipping startup."));
+                        break;
+                }
+
+                if (wPreferences.compositor_config_path && wPreferences.compositor_config_path[0])
+                        expanded = resolve_config_path(wPreferences.compositor_config_path);
+                if (expanded) {
+                        if (!ensure_backend_config("compton.conf", expanded)) {
+                                wwarning(_("Compton configuration %s could not be prepared; launching with defaults."),
+                                         expanded);
+                                wfree(expanded);
+                                expanded = NULL;
+                        } else if (access(expanded, R_OK) != 0) {
+                                int saved = errno;
+
+                                wwarning(_("Compton configuration %s is not accessible (%s); launching with defaults."),
+                                         expanded, strerror(saved));
+                                wfree(expanded);
+                                expanded = NULL;
+                        }
+                }
+
+                if (expanded)
+                        quoted = quote_argument(expanded);
+                if (quoted)
+                        snprintf(command, sizeof(command),
+                                 "compton --backend glx --config %s%s",
+                                 quoted,
+                                 wPreferences.enable_window_shadows ? " --shadow" : "");
+                else
+                        snprintf(command, sizeof(command),
+                                 "compton --backend glx%s",
+                                 wPreferences.enable_window_shadows ? " --shadow" : "");
+                break;
+        case WCOMPOSITOR_XCOMPMGR:
+                if (!command_exists("xcompmgr")) {
+                        wwarning(_("xcompmgr compositor selected but not found in PATH; skipping startup."));
+                        break;
+                }
+                snprintf(command, sizeof(command), "xcompmgr%s",
+                         wPreferences.enable_window_shadows ? " -c" : "");
+                break;
+        case WCOMPOSITOR_COMPIZ:
+                if (!command_exists("compiz")) {
+                        wwarning(_("Compiz compositor selected but not found in PATH; skipping startup."));
+                        break;
+                }
+                snprintf(command, sizeof(command), "compiz --replace ccp");
                 break;
         default:
                 if (wPreferences.compositor_choice != WCOMPOSITOR_NONE)
