@@ -864,7 +864,7 @@ static char *quote_argument(const char *path)
 
         len = 2; /* surrounding quotes */
         for (p = path; *p; p++) {
-                if (*p == '"' || *p == '\\\\')
+                if (*p == '"' || *p == '\\')
                         len += 2;
                 else
                         len++;
@@ -874,8 +874,8 @@ static char *quote_argument(const char *path)
         dst = buffer;
         *dst++ = '"';
         for (p = path; *p; p++) {
-                if (*p == '"' || *p == '\\\\')
-                        *dst++ = '\\\\';
+                if (*p == '"' || *p == '\\')
+                        *dst++ = '\\';
                 *dst++ = *p;
         }
         *dst++ = '"';
