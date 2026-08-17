@@ -117,6 +117,8 @@ typedef struct _Panel {
 	WMWidget *sections[LastInfo][MAX_SECTION_SIZE];
 } _Panel;
 
+static void layoutMenuPanel(_Panel *panel);
+
 typedef struct {
 	InfoType type;
 	union {
@@ -854,6 +856,94 @@ static void createPanel(_Panel * p)
 		if (panel->menu)
 			WEditMenuShowAt(panel->menu, pos.x, pos.y);
 	}
+
+	layoutMenuPanel(panel);
+}
+
+static void layoutMenuPanel(_Panel *panel)
+{
+	int boxWidth, boxHeight;
+	int rightW, panelH, width;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	boxHeight = WMWidgetHeight(panel->box);
+
+	rightW = boxWidth - 10 - 150 - 10 - 10;
+	if (rightW < 250)
+		rightW = 250;
+	panelH = boxHeight - 15;
+	if (panelH < 220)
+		panelH = 220;
+
+	if (panel->optionsF) {
+		WMMoveWidget(panel->optionsF, 10 + 150 + 10, 5);
+		WMResizeWidget(panel->optionsF, rightW, panelH);
+	}
+
+	width = rightW - 20;
+
+	if (panel->commandF) {
+		WMResizeWidget(panel->commandF, width, 50);
+		if (panel->commandT)
+			WMResizeWidget(panel->commandT, width - 95, 20);
+		if (panel->browseB)
+			WMMoveWidget(panel->browseB, width - 80, 18);
+	}
+	if (panel->pathF) {
+		WMResizeWidget(panel->pathF, width, 150);
+		if (panel->pathT)
+			WMResizeWidget(panel->pathT, width - 20, 20);
+	}
+	if (panel->pipeF) {
+		WMResizeWidget(panel->pipeF, width, 150);
+		if (panel->pipeT)
+			WMResizeWidget(panel->pipeT, width - 20, 20);
+	}
+	if (panel->plpipeF) {
+		WMResizeWidget(panel->plpipeF, width, 150);
+		if (panel->plpipeT)
+			WMResizeWidget(panel->plpipeT, width - 20, 20);
+	}
+	if (panel->dcommandF) {
+		WMResizeWidget(panel->dcommandF, width, 90);
+		if (panel->dcommandT)
+			WMResizeWidget(panel->dcommandT, width - 20, 20);
+	}
+	if (panel->dpathF) {
+		WMResizeWidget(panel->dpathF, width, 80);
+		if (panel->dpathT)
+			WMResizeWidget(panel->dpathT, width - 20, 20);
+		if (panel->dstripB)
+			WMResizeWidget(panel->dstripB, width - 20, 20);
+	}
+	if (panel->shortF) {
+		WMResizeWidget(panel->shortF, width, 50);
+		if (panel->shortT)
+			WMResizeWidget(panel->shortT, width - 20 - 150, 20);
+		if (panel->sgrabB)
+			WMMoveWidget(panel->sgrabB, width - 80, 18);
+		if (panel->sclearB)
+			WMMoveWidget(panel->sclearB, width - 155, 18);
+	}
+	if (panel->icommandL) {
+		WMResizeWidget(panel->icommandL, width, 80);
+	}
+	if (panel->paramF) {
+		WMResizeWidget(panel->paramF, width, 50);
+		if (panel->paramT)
+			WMResizeWidget(panel->paramT, width - 20, 20);
+	}
+	if (panel->quickB) {
+		WMResizeWidget(panel->quickB, width, 20);
+	}
+}
+
+static void resizeMenu(Panel *p)
+{
+	layoutMenuPanel((_Panel *) p);
 }
 
 static void freeItemData(ItemData * data)
@@ -1817,6 +1907,7 @@ Panel *InitMenu(WMWidget *parent)
 	panel->callbacks.updateDomain = storeData;
 	panel->callbacks.showPanel = showMenus;
 	panel->callbacks.hidePanel = hideMenus;
+	panel->callbacks.resizePanel = resizeMenu;
 
 	AddSection(panel, ICON_FILE);
 

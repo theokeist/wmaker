@@ -45,6 +45,8 @@ typedef struct _Panel {
 
 } _Panel;
 
+static void layoutMenuPreferencesPanel(_Panel *panel);
+
 #define ICON_FILE	"menuprefs"
 #define SPEED_IMAGE "speed%i"
 #define SPEED_IMAGE_S "speed%is"
@@ -210,6 +212,45 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutMenuPreferencesPanel(panel);
+}
+
+static void layoutMenuPreferencesPanel(_Panel *panel)
+{
+	int boxWidth;
+	int colW;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	colW = (boxWidth - 40) / 2;
+	if (colW < 220)
+		colW = 220;
+
+	if (panel->scrF) {
+		WMResizeWidget(panel->scrF, colW, 90);
+		WMMoveWidget(panel->scrF, 15, 20);
+	}
+	if (panel->aliF) {
+		WMMoveWidget(panel->aliF, 15 + colW + 10, 20);
+		WMResizeWidget(panel->aliF, colW, 90);
+	}
+	if (panel->optF) {
+		WMResizeWidget(panel->optF, boxWidth - 30, 96);
+		WMMoveWidget(panel->optF, 15, 120);
+		if (panel->wrapB)
+			WMResizeWidget(panel->wrapB, boxWidth - 60, 32);
+		if (panel->autoB)
+			WMResizeWidget(panel->autoB, boxWidth - 60, 32);
+		if (panel->autoC)
+			WMResizeWidget(panel->autoC, boxWidth - 60, 32);
+	}
+}
+
+static void resizeMenuPreferences(Panel *p)
+{
+	layoutMenuPreferencesPanel((_Panel *) p);
 }
 
 Panel *InitMenuPreferences(WMWidget *parent)
@@ -226,6 +267,7 @@ Panel *InitMenuPreferences(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizeMenuPreferences;
 
 	AddSection(panel, ICON_FILE);
 

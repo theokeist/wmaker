@@ -59,6 +59,8 @@ typedef struct _Panel {
 	int actionCount;
 } _Panel;
 
+static void layoutKeyboardShortcutsPanel(_Panel *panel);
+
 #define ICON_FILE	"keyshortcuts"
 
 /*
@@ -722,6 +724,49 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutKeyboardShortcutsPanel(panel);
+}
+
+static void layoutKeyboardShortcutsPanel(_Panel *panel)
+{
+	int boxWidth, boxHeight;
+	int leftW, rightW, panelH;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	boxHeight = WMWidgetHeight(panel->box);
+
+	rightW = 190;
+	leftW = boxWidth - rightW - 28;
+	if (leftW < 250)
+		leftW = 250;
+	panelH = boxHeight - 20;
+	if (panelH < 200)
+		panelH = 200;
+
+	if (panel->actL) {
+		WMResizeWidget(panel->actL, leftW, 20);
+		WMMoveWidget(panel->actL, 9, 9);
+	}
+	if (panel->actLs) {
+		WMResizeWidget(panel->actLs, leftW, panelH - 24);
+		WMMoveWidget(panel->actLs, 9, 31);
+	}
+	if (panel->shoF) {
+		WMMoveWidget(panel->shoF, 9 + leftW + 10, 8);
+		WMResizeWidget(panel->shoF, rightW, panelH + 2);
+		if (panel->shoT)
+			WMResizeWidget(panel->shoT, rightW - 18, 20);
+		if (panel->instructionsL)
+			WMResizeWidget(panel->instructionsL, rightW - 18, 55);
+	}
+}
+
+static void resizeKeyboardShortcuts(Panel *p)
+{
+	layoutKeyboardShortcutsPanel((_Panel *) p);
 }
 
 static void storeData(_Panel * panel)
@@ -762,6 +807,7 @@ Panel *InitKeyboardShortcuts(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizeKeyboardShortcuts;
 
 	AddSection(panel, ICON_FILE);
 

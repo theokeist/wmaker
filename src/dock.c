@@ -899,6 +899,36 @@ static int getDockXPosition(WScreen *scr, Bool on_right_side)
 	return x;
 }
 
+static int getDockYPosition(WScreen *scr, Bool on_bottom_side)
+{
+	int y;
+	int max_y;
+
+	if (wPreferences.keep_dock_on_primary_head) {
+		WMRect rect;
+
+		rect = wGetRectForHead(scr, scr->xine_info.primary_head);
+		y = rect.pos.y;
+		if (on_bottom_side)
+			y += rect.size.height - ICON_SIZE - DOCK_EXTRA_SPACE;
+		else
+			y += DOCK_EXTRA_SPACE;
+	} else {
+		if (on_bottom_side)
+			y = scr->scr_height - ICON_SIZE - DOCK_EXTRA_SPACE;
+		else
+			y = DOCK_EXTRA_SPACE;
+	}
+
+	max_y = WMAX(0, scr->scr_height - ICON_SIZE);
+	if (y < 0)
+		y = 0;
+	else if (y > max_y)
+		y = max_y;
+
+	return y;
+}
+
 /* Name is only used when type == WM_DRAWER and when restoring a specific
  * drawer, with a specific name. When creating a drawer, leave name to NULL
  * and mainIconCreate will find the first unused unique name */
@@ -915,13 +945,23 @@ static WAppIcon *mainIconCreate(WScreen *scr, int type, const char *name)
 		btn = wAppIconCreateForDock(scr, NULL, "Logo", "WMClip", TILE_CLIP);
 		btn->icon->core->descriptor.handle_expose = clipIconExpose;
 		x_pos = 0;
+		btn->x_pos = 0;
+		btn->y_pos = 0;
 		break;
 	case WM_DOCK:
 	default: /* to avoid a warning about btn and x_pos, basically */
 		btn = wAppIconCreateForDock(scr, NULL, "Logo", "WMDock", TILE_NORMAL);
 		if (wPreferences.flags.clip_merged_in_dock)
 			btn->icon->core->descriptor.handle_expose = clipIconExpose;
-		x_pos = getDockXPosition(scr, True);
+		if (wPreferences.horizontal_dock) {
+			x_pos = 0;
+			btn->x_pos = 0;
+			btn->y_pos = getDockYPosition(scr, wPreferences.dock_position == 3);
+		} else {
+			x_pos = getDockXPosition(scr, True);
+			btn->x_pos = x_pos;
+			btn->y_pos = 0;
+		}
 		break;
 	case WM_DRAWER:
 		if (name == NULL)
@@ -929,6 +969,8 @@ static WAppIcon *mainIconCreate(WScreen *scr, int type, const char *name)
 		btn = wAppIconCreateForDock(scr, NULL, name, "WMDrawer", TILE_DRAWER);
 		btn->icon->core->descriptor.handle_expose = drawerIconExpose;
 		x_pos = 0;
+		btn->x_pos = 0;
+		btn->y_pos = 0;
 	}
 
 	btn->xindex = 0;
@@ -1406,7 +1448,10 @@ WDock *wDockCreate(WScreen *scr, int type, const char *name)
 		break;
 	case WM_DOCK:
 	default:
-		dock->max_icons = WMAX(1, scr->scr_height / wPreferences.icon_size);
+		if (wPreferences.horizontal_dock)
+			dock->max_icons = WMAX(1, scr->scr_width / wPreferences.icon_size);
+		else
+			dock->max_icons = WMAX(1, scr->scr_height / wPreferences.icon_size);
 	}
 
 	dock->icon_array = wmalloc(sizeof(WAppIcon *) * dock->max_icons);
@@ -1421,10 +1466,12 @@ WDock *wDockCreate(WScreen *scr, int type, const char *name)
 	dock->screen_ptr = scr;
 	dock->type = type;
 	dock->icon_count = 1;
+	dock->is_horizontal = (type == WM_DOCK && wPreferences.horizontal_dock);
+	dock->on_bottom_side = (wPreferences.dock_position == 3);
 	if (type == WM_DRAWER)
-		dock->on_right_side = scr->dock->on_right_side;
+		dock->on_right_side = scr->dock ? scr->dock->on_right_side : 1;
 	else
-		dock->on_right_side = 1;
+		dock->on_right_side = (wPreferences.dock_position != 1);
 	dock->collapsed = 0;
 	dock->auto_collapse = 0;
 	dock->auto_collapse_magic = NULL;
@@ -1918,6 +1965,20 @@ WDock *wDockRestoreState(WScreen *scr, WMPropList *dock_state, int type)
 					dock->x_pos = 0;
 				} else if (dock->x_pos > scr->scr_width - ICON_SIZE) {
 					dock->x_pos = scr->scr_width - ICON_SIZE;
+				}
+			} else if (dock->is_horizontal) {
+				int top, bottom, midpoint;
+
+				top = getDockYPosition(scr, False);
+				bottom = getDockYPosition(scr, True);
+				midpoint = (top + bottom) / 2;
+
+				if (dock->y_pos < midpoint) {
+					dock->y_pos = top;
+					dock->on_bottom_side = 0;
+				} else {
+					dock->y_pos = bottom;
+					dock->on_bottom_side = 1;
 				}
 			} else {
 				int left, right, midpoint;
@@ -2612,6 +2673,77 @@ Bool wDockSnapIcon(WDock *dock, WAppIcon *icon, int req_x, int req_y, int *ret_x
 
 	switch (dock->type) {
 	case WM_DOCK:
+		if (dock->is_horizontal) {
+			if (icon->dock != dock && ex_y != 0 &&
+				!(icon->dock && icon->dock->type == WM_DRAWER && icon == icon->dock->icon_array[0]))
+				return False;
+
+			if (!redocking && ex_y != 0)
+				return False;
+
+			aicon = NULL;
+			for (i = 0; i < dock->max_icons; i++) {
+				nicon = dock->icon_array[i];
+				if (nicon && nicon->xindex == ex_x) {
+					aicon = nicon;
+					break;
+				}
+			}
+
+			if (redocking) {
+				int sig, done, closest;
+
+				if (abs(ex_y) > DOCK_DETTACH_THRESHOLD)
+					return False;
+
+				if (aicon == icon || !aicon) {
+					*ret_x = ex_x;
+					*ret_y = 0;
+					return True;
+				}
+
+				if (ex_x * ICON_SIZE < (req_x + offset - dx))
+					sig = 1;
+				else
+					sig = -1;
+
+				done = 0;
+				for (i = 0; i < (DOCK_DETTACH_THRESHOLD + 1) * 2 && !done; i++) {
+					int j;
+
+					done = 1;
+					closest = sig * (i / 2) + ex_x;
+					if (onScreen(scr, dx + closest * ICON_SIZE, dy)) {
+						for (j = 0; j < dock->max_icons; j++) {
+							if (dock->icon_array[j]
+								&& dock->icon_array[j]->xindex == closest) {
+								if (dock->icon_array[j] != icon)
+									done = 0;
+								break;
+							}
+						}
+					} else {
+						done = 0;
+					}
+					sig = -sig;
+				}
+				if (done &&
+					((ex_x >= closest && ex_x - closest < DOCK_DETTACH_THRESHOLD + 1)
+						|| (ex_x < closest && closest - ex_x <= DOCK_DETTACH_THRESHOLD + 1))) {
+					*ret_x = closest;
+					*ret_y = 0;
+					return True;
+				}
+			} else {
+				if (!aicon && ex_y == 0) {
+					*ret_x = ex_x;
+					*ret_y = 0;
+					return True;
+				}
+			}
+			break;
+		}
+
 		/* We can return False right away if
 		 * - we do not come from this dock (which is a WM_DOCK),
 		 * - we are not right over it, and
@@ -2838,6 +2970,39 @@ Bool wDockFindFreeSlot(WDock *dock, int *x_pos, int *y_pos)
 		*x_pos = dock->icon_count * (dock->on_right_side ? -1 : 1);
 		*y_pos = 0;
 		return True;
+	}
+
+	if (dock->type == WM_DOCK) {
+		int count = dock->max_icons;
+		char *map = wmalloc(count);
+		memset(map, 0, count);
+		for (i = 0; i < dock->max_icons; i++) {
+			btn = dock->icon_array[i];
+			if (btn) {
+				int idx = dock->is_horizontal ? btn->xindex : btn->yindex;
+				if (idx >= 0 && idx < count)
+					map[idx] = 1;
+			}
+		}
+		for (i = 1; i < count; i++) {
+			if (!map[i]) {
+				int tx = dock->is_horizontal ? (dock->x_pos + i * ICON_SIZE) : dock->x_pos;
+				int ty = dock->is_horizontal ? dock->y_pos : (dock->y_pos + i * ICON_SIZE);
+				if (onScreen(scr, tx, ty)) {
+					if (dock->is_horizontal) {
+						*x_pos = i;
+						*y_pos = 0;
+					} else {
+						*x_pos = 0;
+						*y_pos = i;
+					}
+					wfree(map);
+					return True;
+				}
+			}
+		}
+		wfree(map);
+		return False;
 	}
 
 	if (dock->type == WM_CLIP && dock != scr->workspaces[scr->current_workspace]->clip)
@@ -3112,17 +3277,34 @@ void wDockSwap(WDock *dock)
 {
 	WScreen *scr = dock->screen_ptr;
 	WAppIcon *btn;
-	int x, i;
+	int x, y, i;
 
-	x = getDockXPosition(scr, dock->on_right_side);
-	swapDrawers(scr, x);
-	dock->x_pos = x;
+	dock->is_horizontal = wPreferences.horizontal_dock;
 
-	for (i = 0; i < dock->max_icons; i++) {
-		btn = dock->icon_array[i];
-		if (btn) {
-			btn->x_pos = x;
-			XMoveWindow(dpy, btn->icon->core->window, btn->x_pos, btn->y_pos);
+	if (dock->is_horizontal) {
+		y = getDockYPosition(scr, dock->on_bottom_side);
+		dock->y_pos = y;
+
+		for (i = 0; i < dock->max_icons; i++) {
+			btn = dock->icon_array[i];
+			if (btn) {
+				btn->x_pos = dock->x_pos + btn->xindex * ICON_SIZE;
+				btn->y_pos = y + btn->yindex * ICON_SIZE;
+				XMoveWindow(dpy, btn->icon->core->window, btn->x_pos, btn->y_pos);
+			}
+		}
+	} else {
+		x = getDockXPosition(scr, dock->on_right_side);
+		swapDrawers(scr, x);
+		dock->x_pos = x;
+
+		for (i = 0; i < dock->max_icons; i++) {
+			btn = dock->icon_array[i];
+			if (btn) {
+				btn->x_pos = x + btn->xindex * ICON_SIZE;
+				btn->y_pos = dock->y_pos + btn->yindex * ICON_SIZE;
+				XMoveWindow(dpy, btn->icon->core->window, btn->x_pos, btn->y_pos);
+			}
 		}
 	}
 
@@ -3907,23 +4089,42 @@ static void handleDockMove(WDock *dock, WAppIcon *aicon, XEvent *event)
 			case WM_DOCK:
 				x = ev.xmotion.x_root - ofs_x;
 				y = ev.xmotion.y_root - ofs_y;
-				if (previously_on_right)
-				{
-					now_on_right = (ev.xmotion.x_root >= previous_x_pos - ICON_SIZE);
+				if (dock->is_horizontal) {
+					int previously_on_bottom = dock->on_bottom_side;
+					int now_on_bottom;
+					int previous_y_pos = getDockYPosition(scr, previously_on_bottom);
+
+					if (previously_on_bottom)
+						now_on_bottom = (ev.xmotion.y_root >= previous_y_pos - ICON_SIZE);
+					else
+						now_on_bottom = (ev.xmotion.y_root > previous_y_pos + ICON_SIZE * 2);
+
+					if (now_on_bottom != dock->on_bottom_side) {
+						dock->on_bottom_side = now_on_bottom;
+						wDockSwap(dock);
+						wArrangeIcons(scr, False);
+					}
+					wScreenKeepInside(scr, &x, &y, ICON_SIZE, ICON_SIZE);
+					moveDock(dock, x, dock->y_pos);
+				} else {
+					if (previously_on_right)
+					{
+						now_on_right = (ev.xmotion.x_root >= previous_x_pos - ICON_SIZE);
+					}
+					else
+					{
+						now_on_right = (ev.xmotion.x_root > previous_x_pos + ICON_SIZE * 2);
+					}
+					if (now_on_right != dock->on_right_side)
+					{
+						dock->on_right_side = now_on_right;
+						wDockSwap(dock);
+						wArrangeIcons(scr, False);
+					}
+					// Also perform the vertical move
+					wScreenKeepInside(scr, &x, &y, ICON_SIZE, ICON_SIZE);
+					moveDock(dock, dock->x_pos, y);
 				}
-				else
-				{
-					now_on_right = (ev.xmotion.x_root > previous_x_pos + ICON_SIZE * 2);
-				}
-				if (now_on_right != dock->on_right_side)
-				{
-					dock->on_right_side = now_on_right;
-					wDockSwap(dock);
-					wArrangeIcons(scr, False);
-				}
-				// Also perform the vertical move
-				wScreenKeepInside(scr, &x, &y, ICON_SIZE, ICON_SIZE);
-				moveDock(dock, dock->x_pos, y);
 				if (wPreferences.flags.wrap_appicons_in_dock)
 				{
 					for (i = 0; i < dock->max_icons; i++) {

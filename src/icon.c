@@ -22,6 +22,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/shape.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -317,8 +318,21 @@ static void icon_update_pixmap(WIcon *icon, RImage *image)
 		RLightImage(tile, &color);
 	}
 
-	if (!RConvertImage(scr->rcontext, tile, &pixmap))
-		wwarning(_("error rendering image:%s"), RMessageForError(RErrorCode));
+	if (tile->format == RRGBAFormat) {
+		Pixmap mask = None;
+		if (!RConvertImageMask(scr->rcontext, tile, &pixmap, &mask, 1))
+			wwarning(_("error rendering image:%s"), RMessageForError(RErrorCode));
+		if (mask != None) {
+			XShapeCombineMask(dpy, icon->core->window, ShapeBounding, 0, 0, mask, ShapeSet);
+			XFreePixmap(dpy, mask);
+		} else {
+			XShapeCombineMask(dpy, icon->core->window, ShapeBounding, 0, 0, None, ShapeSet);
+		}
+	} else {
+		if (!RConvertImage(scr->rcontext, tile, &pixmap))
+			wwarning(_("error rendering image:%s"), RMessageForError(RErrorCode));
+		XShapeCombineMask(dpy, icon->core->window, ShapeBounding, 0, 0, None, ShapeSet);
+	}
 
 	RReleaseImage(tile);
 

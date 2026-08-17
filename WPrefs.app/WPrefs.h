@@ -67,6 +67,7 @@ typedef struct {
     void (*prepareForClose)(Panel*);   /* called when exiting WPrefs */
     void (*showPanel)(Panel*);	       /* called when entering the panel */
     void (*hidePanel)(Panel*);	       /* called when exiting the panel */
+    void (*resizePanel)(Panel*);       /* called when panel needs resize/layout update */
 } CallbackRec;
 
 

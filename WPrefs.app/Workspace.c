@@ -45,6 +45,8 @@ typedef struct _Panel {
 	WMPopUpButton *posP;
 } _Panel;
 
+static void layoutWorkspacePanel(_Panel *panel);
+
 #define ICON_FILE	"workspace"
 
 #define ARQUIVO_XIS	"xis"
@@ -202,6 +204,42 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutWorkspacePanel(panel);
+}
+
+static void layoutWorkspacePanel(_Panel *panel)
+{
+	int boxWidth, boxHeight;
+	int frameW, frameH;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	boxHeight = WMWidgetHeight(panel->box);
+
+	frameW = boxWidth - 30;
+	if (frameW < 480)
+		frameW = 480;
+	frameH = boxHeight - 20;
+	if (frameH < 210)
+		frameH = 210;
+
+	if (panel->navF) {
+		WMResizeWidget(panel->navF, frameW, frameH);
+		WMMoveWidget(panel->navF, 15, 8);
+		if (panel->cyclB)
+			WMResizeWidget(panel->cyclB, frameW - 80, 34);
+		if (panel->linkB)
+			WMResizeWidget(panel->linkB, frameW - 80, 34);
+		if (panel->newB)
+			WMResizeWidget(panel->newB, frameW - 80, 34);
+	}
+}
+
+static void resizeWorkspace(Panel *p)
+{
+	layoutWorkspacePanel((_Panel *) p);
 }
 
 static void storeData(_Panel * panel)
@@ -232,6 +270,7 @@ Panel *InitWorkspace(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizeWorkspace;
 
 	AddSection(panel, ICON_FILE);
 

@@ -70,6 +70,8 @@ typedef struct _Panel {
 
 } _Panel;
 
+static void layoutWindowHandlingPanel(_Panel *panel);
+
 #define ICON_FILE "whandling"
 
 #define OPAQUE_MOVE_PIXMAP "opaque"
@@ -606,6 +608,39 @@ static void createPanel(Panel * p)
 
 	/* show the config data */
 	showData(panel);
+	layoutWindowHandlingPanel(panel);
+}
+
+static void layoutWindowHandlingPanel(_Panel *panel)
+{
+	int boxWidth, boxHeight;
+	int scrollWidth, scrollHeight;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	boxHeight = WMWidgetHeight(panel->box);
+
+	scrollWidth = boxWidth - 16;
+	if (scrollWidth < 500)
+		scrollWidth = 500;
+	scrollHeight = boxHeight - 16;
+	if (scrollHeight < 200)
+		scrollHeight = 200;
+
+	if (panel->scrollV) {
+		WMResizeWidget(panel->scrollV, scrollWidth, scrollHeight);
+		WMMoveWidget(panel->scrollV, 8, 8);
+	}
+	if (panel->contentB) {
+		WMResizeWidget(panel->contentB, scrollWidth - 16, WINDOW_HANDLING_CONTENT_HEIGHT);
+	}
+}
+
+static void resizeWindowHandling(Panel *p)
+{
+	layoutWindowHandlingPanel((_Panel *) p);
 }
 
 static void undo(_Panel * panel)
@@ -629,6 +664,7 @@ Panel *InitWindowHandling(WMWidget *parent)
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
 	panel->callbacks.undoChanges = undo;
+	panel->callbacks.resizePanel = resizeWindowHandling;
 
 	AddSection(panel, ICON_FILE);
 

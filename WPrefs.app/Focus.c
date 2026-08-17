@@ -51,6 +51,8 @@ typedef struct _Panel {
 	char raiseDelaySelected;
 } _Panel;
 
+static void layoutFocusPanel(_Panel *panel);
+
 #define ICON_FILE	"windowfocus"
 
 #define DELAY_ICON "timer%i"
@@ -340,6 +342,53 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutFocusPanel(panel);
+}
+
+static void layoutFocusPanel(_Panel *panel)
+{
+	int boxWidth;
+	int colW;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	colW = (boxWidth - 35) / 2;
+	if (colW < 240)
+		colW = 240;
+
+	if (panel->kfocF) {
+		WMResizeWidget(panel->kfocF, colW, 125);
+		WMMoveWidget(panel->kfocF, 15, 10);
+	}
+	if (panel->cfocF) {
+		WMResizeWidget(panel->cfocF, colW, 77);
+		WMMoveWidget(panel->cfocF, 15, 143);
+		if (panel->manB)
+			WMResizeWidget(panel->manB, colW - 14, 24);
+		if (panel->autB)
+			WMResizeWidget(panel->autB, colW - 14, 24);
+	}
+	if (panel->raisF) {
+		WMResizeWidget(panel->raisF, colW, 68);
+		WMMoveWidget(panel->raisF, 15 + colW + 10, 10);
+	}
+	if (panel->optF) {
+		WMResizeWidget(panel->optF, colW, 132);
+		WMMoveWidget(panel->optF, 15 + colW + 10, 88);
+		if (panel->ignB)
+			WMResizeWidget(panel->ignB, colW - 17, 48);
+		if (panel->newB)
+			WMResizeWidget(panel->newB, colW - 17, 35);
+		if (panel->craisB)
+			WMResizeWidget(panel->craisB, colW - 17, 36);
+	}
+}
+
+static void resizeFocus(Panel *p)
+{
+	layoutFocusPanel((_Panel *) p);
 }
 
 Panel *InitFocus(WMWidget *parent)
@@ -354,6 +403,7 @@ Panel *InitFocus(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizeFocus;
 
 	AddSection(panel, ICON_FILE);
 

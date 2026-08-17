@@ -158,6 +158,8 @@ typedef struct _Panel {
 
 } _Panel;
 
+static void layoutExpertPanel(_Panel *panel);
+
 #define ICON_FILE	"expert"
 
 static void changeIntTextfield(void *data, int delta)
@@ -435,6 +437,45 @@ static void createPanel(Panel *p)
 	WMCreateEventHandler(WMWidgetView(sv), ButtonPressMask, scrollViewWheelHandler, panel);
 	WMAddNotificationObserver(scrollViewRealizeObserver, panel, WMViewRealizedNotification, WMWidgetView(sv));
 	WMRealizeWidget(panel->box);
+	layoutExpertPanel(panel);
+}
+
+static void layoutExpertPanel(_Panel *panel)
+{
+	int boxWidth, boxHeight;
+	int svW, svH;
+	int i;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	boxHeight = WMWidgetHeight(panel->box);
+
+	svW = boxWidth - 24;
+	if (svW < 400)
+		svW = 400;
+	svH = boxHeight - 20;
+	if (svH < 200)
+		svH = 200;
+
+	if (panel->sv) {
+		WMResizeWidget(panel->sv, svW, svH);
+		WMMoveWidget(panel->sv, 12, 10);
+	}
+	if (panel->frame) {
+		WMResizeWidget(panel->frame, svW - 10, wlengthof(expert_options) * 25 + 8);
+		for (i = 0; i < wlengthof(expert_options); i++) {
+			if (expert_options[i].class != OPTION_WMAKER_INT && panel->swi[i]) {
+				WMResizeWidget(panel->swi[i], svW - 20, 25);
+			}
+		}
+	}
+}
+
+static void resizeExpert(Panel *p)
+{
+	layoutExpertPanel((_Panel *) p);
 }
 
 static void storeDefaults(_Panel *panel)
@@ -495,6 +536,7 @@ Panel *InitExpert(WMWidget *parent)
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeDefaults;
 	panel->callbacks.prepareForClose = scrollViewPrepareForClose;
+	panel->callbacks.resizePanel = resizeExpert;
 
 	AddSection(panel, ICON_FILE);
 

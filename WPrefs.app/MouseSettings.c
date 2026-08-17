@@ -111,6 +111,8 @@ typedef struct _Panel {
 	float acceleration;
 } _Panel;
 
+static void layoutMouseSettingsPanel(_Panel *panel);
+
 #define ICON_FILE "mousesettings"
 
 #define SPEED_ICON_FILE "mousespeed"
@@ -630,8 +632,51 @@ static void createPanel(Panel * p)
 
 	WMRealizeWidget(panel->box);
 	WMMapSubwidgets(panel->box);
-
 	showData(panel);
+	layoutMouseSettingsPanel(panel);
+}
+
+static void layoutMouseSettingsPanel(_Panel *panel)
+{
+	int boxWidth;
+	int colW, rightW;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	colW = (boxWidth - 30) / 2;
+	if (colW < 220)
+		colW = 220;
+	rightW = boxWidth - colW - 30;
+	if (rightW < 240)
+		rightW = 240;
+
+	if (panel->grabF) {
+		WMResizeWidget(panel->grabF, colW, 46);
+		WMMoveWidget(panel->grabF, 9, 5);
+		if (panel->grabP)
+			WMResizeWidget(panel->grabP, colW - 40, 20);
+	}
+	if (panel->speedF) {
+		WMResizeWidget(panel->speedF, colW, 85);
+		WMMoveWidget(panel->speedF, 9, 54);
+		if (panel->speedS)
+			WMResizeWidget(panel->speedS, colW - 70, 15);
+	}
+	if (panel->ddelaF) {
+		WMResizeWidget(panel->ddelaF, colW, 80);
+		WMMoveWidget(panel->ddelaF, 9, 142);
+	}
+	if (panel->menuF) {
+		WMMoveWidget(panel->menuF, 9 + colW + 10, 5);
+		WMResizeWidget(panel->menuF, rightW, 217);
+	}
+}
+
+static void resizeMouseSettings(Panel *p)
+{
+	layoutMouseSettingsPanel((_Panel *) p);
 }
 
 static void storeCommandInScript(const char *cmd, const char *line)
@@ -790,6 +835,7 @@ Panel *InitMouseSettings(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizeMouseSettings;
 
 	AddSection(panel, ICON_FILE);
 

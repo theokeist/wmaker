@@ -59,6 +59,8 @@ typedef struct _Panel {
 	int cmapSize;
 } _Panel;
 
+static void layoutConfigurationsPanel(_Panel *panel);
+
 #define ICON_FILE	"configs"
 #define OLDS_IMAGE	"oldstyle"
 #define NEWS_IMAGE	"newstyle"
@@ -392,6 +394,47 @@ static void createPanel(Panel *p)
 		RReleaseImage(xis);
 	WMReleaseFont(font);
 	showData(panel);
+	layoutConfigurationsPanel(panel);
+}
+
+static void layoutConfigurationsPanel(_Panel *panel)
+{
+	int boxWidth;
+	int colW;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	colW = (boxWidth - 35) / 2;
+	if (colW < 220)
+		colW = 220;
+
+	if (panel->icoF) {
+		WMResizeWidget(panel->icoF, colW, 45);
+		WMMoveWidget(panel->icoF, 15, 10);
+	}
+	if (panel->shaF) {
+		WMResizeWidget(panel->shaF, colW, 45);
+		WMMoveWidget(panel->shaF, 15, 65);
+	}
+	if (panel->titlF) {
+		WMResizeWidget(panel->titlF, colW, 97);
+		WMMoveWidget(panel->titlF, 15, 120);
+	}
+	if (panel->smoF) {
+		WMMoveWidget(panel->smoF, 15 + colW + 10, 10);
+		WMResizeWidget(panel->smoF, colW, 100);
+	}
+	if (panel->dithF) {
+		WMMoveWidget(panel->dithF, 15 + colW + 10, 120);
+		WMResizeWidget(panel->dithF, colW, 97);
+	}
+}
+
+static void resizeConfigurations(Panel *p)
+{
+	layoutConfigurationsPanel((_Panel *) p);
 }
 
 static void storeData(_Panel *panel)
@@ -437,6 +480,7 @@ Panel *InitConfigurations(WMWidget *parent)
 	panel->parent = parent;
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizeConfigurations;
 
 	AddSection(panel, ICON_FILE);
 

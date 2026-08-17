@@ -96,6 +96,8 @@ typedef struct _Panel {
 	int iconPos;
 } _Panel;
 
+static void layoutIconsPanel(_Panel *panel);
+
 /*
  * Minimum size for a Mini-Preview:
  * This value is actually twice the size of the minimum icon size choosable.
@@ -455,6 +457,57 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutIconsPanel(panel);
+}
+
+static void layoutIconsPanel(_Panel *panel)
+{
+	int boxWidth;
+	int colW;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	colW = (boxWidth - 35) / 2;
+	if (colW < 240)
+		colW = 240;
+
+	if (panel->posF) {
+		WMResizeWidget(panel->posF, colW, 155);
+		WMMoveWidget(panel->posF, 12, 6);
+	}
+	if (panel->size.frame) {
+		WMResizeWidget(panel->size.frame, colW, 52);
+		WMMoveWidget(panel->size.frame, 12, 168);
+	}
+	if (panel->minipreview.frame) {
+		WMResizeWidget(panel->minipreview.frame, colW, 52);
+		WMMoveWidget(panel->minipreview.frame, 12, 232);
+	}
+	if (panel->animF) {
+		WMMoveWidget(panel->animF, 15 + colW + 10, 6);
+		WMResizeWidget(panel->animF, colW, 52);
+		if (panel->animP)
+			WMResizeWidget(panel->animP, colW - 20, 20);
+	}
+	if (panel->optF) {
+		WMMoveWidget(panel->optF, 15 + colW + 10, 68);
+		WMResizeWidget(panel->optF, colW, 155);
+		if (panel->arrB)
+			WMResizeWidget(panel->arrB, colW - 20, 26);
+		if (panel->omnB)
+			WMResizeWidget(panel->omnB, colW - 20, 26);
+		if (panel->sclB)
+			WMResizeWidget(panel->sclB, colW - 20, 26);
+		if (panel->marginB)
+			WMResizeWidget(panel->marginB, colW - 20, 26);
+	}
+}
+
+static void resizeIcons(Panel *p)
+{
+	layoutIconsPanel((_Panel *) p);
 }
 
 static void storeData(_Panel * panel)
@@ -509,6 +562,7 @@ Panel *InitIcons(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizeIcons;
 
 	AddSection(panel, ICON_FILE);
 

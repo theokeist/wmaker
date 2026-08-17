@@ -425,6 +425,8 @@ extern struct WPreferences {
 
 	char dont_blink;                   /* do not blink icon selection */
 	char keep_dock_on_primary_head;    /* keep dock on primary head */
+	char horizontal_dock;              /* horizontal dock placement (top/bottom) */
+	char dock_position;                /* dock position: 0=right, 1=left, 2=top, 3=bottom */
 #ifdef USE_RANDR
 	char hotplug_monitor;              /* auto-(de)activate monitors */
 #endif

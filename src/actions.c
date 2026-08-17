@@ -2481,10 +2481,17 @@ void wArrangeIcons(WScreen *scr, Bool arrangeAll)
 		if (scr->dock) {
 			int offset = wPreferences.icon_size + DOCK_EXTRA_SPACE;
 
-			if (scr->dock->on_right_side)
-				area.x2 -= offset;
-			else
-				area.x1 += offset;
+			if (scr->dock->is_horizontal) {
+				if (scr->dock->on_bottom_side)
+					area.y2 -= offset;
+				else
+					area.y1 += offset;
+			} else {
+				if (scr->dock->on_right_side)
+					area.x2 -= offset;
+				else
+					area.x1 += offset;
+			}
 		}
 
 		rect = wmkrect(area.x1, area.y1, area.x2 - area.x1, area.y2 - area.y1);

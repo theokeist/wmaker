@@ -102,6 +102,8 @@ typedef struct _Panel {
 
 } _Panel;
 
+static void layoutPreferencesPanel(_Panel *panel);
+
 #define ICON_FILE	"ergonomic"
 
 static void borderCallback(WMWidget * w, void *data)
@@ -336,6 +338,60 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutPreferencesPanel(panel);
+}
+
+static void layoutPreferencesPanel(_Panel *panel)
+{
+	int boxWidth;
+	int colW;
+	int i;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	colW = (boxWidth - 35) / 2;
+	if (colW < 240)
+		colW = 240;
+
+	if (panel->sizeF) {
+		WMResizeWidget(panel->sizeF, colW, 52);
+		WMMoveWidget(panel->sizeF, 15, 7);
+		if (panel->sizeP)
+			WMResizeWidget(panel->sizeP, colW - 28, 20);
+	}
+	if (panel->posiF) {
+		WMResizeWidget(panel->posiF, colW, 52);
+		WMMoveWidget(panel->posiF, 15, 66);
+		if (panel->posiP)
+			WMResizeWidget(panel->posiP, colW - 28, 20);
+	}
+	if (panel->optF) {
+		WMResizeWidget(panel->optF, colW, 96);
+		WMMoveWidget(panel->optF, 15, 125);
+		for (i = 0; i < wlengthof(appicon_bouncing); i++) {
+			if (panel->bounceB[i])
+				WMResizeWidget(panel->bounceB[i], colW - 18, 26);
+		}
+	}
+	if (panel->ballF) {
+		WMMoveWidget(panel->ballF, 15 + colW + 10, 7);
+		WMResizeWidget(panel->ballF, colW, 130);
+		for (i = 0; i < wlengthof(balloon_choices); i++) {
+			if (panel->ballB[i])
+				WMResizeWidget(panel->ballB[i], colW - 22, 20);
+		}
+	}
+	if (panel->borderF) {
+		WMMoveWidget(panel->borderF, 15 + colW + 10, 144);
+		WMResizeWidget(panel->borderF, colW, 77);
+	}
+}
+
+static void resizePreferences(Panel *p)
+{
+	layoutPreferencesPanel((_Panel *) p);
 }
 
 Panel *InitPreferences(WMWidget *parent)
@@ -351,6 +407,7 @@ Panel *InitPreferences(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizePreferences;
 
 	AddSection(panel, ICON_FILE);
 

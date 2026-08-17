@@ -51,6 +51,8 @@ typedef struct _Panel {
 	WMFont *font;
 } _Panel;
 
+static void layoutPathsPanel(_Panel *panel);
+
 #define ICON_FILE	"paths"
 
 static void addPathToList(WMList * list, int index, const char *path)
@@ -304,6 +306,59 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutPathsPanel(panel);
+}
+
+static void layoutPathsPanel(_Panel *panel)
+{
+	int boxWidth, boxHeight;
+	int tabW, tabH, contentW, contentH;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	boxHeight = WMWidgetHeight(panel->box);
+
+	tabW = boxWidth - 24;
+	if (tabW < 400)
+		tabW = 400;
+	tabH = boxHeight - 20;
+	if (tabH < 200)
+		tabH = 200;
+
+	if (panel->tabv) {
+		WMResizeWidget(panel->tabv, tabW, tabH);
+		WMMoveWidget(panel->tabv, 12, 10);
+	}
+
+	contentW = tabW - 4;
+	contentH = tabH - 30;
+
+	if (panel->icoF) {
+		WMResizeWidget(panel->icoF, contentW, contentH);
+		if (panel->icoL)
+			WMResizeWidget(panel->icoL, contentW - 20, contentH - 45);
+		if (panel->icoaB)
+			WMMoveWidget(panel->icoaB, contentW - 210, contentH - 30);
+		if (panel->icorB)
+			WMMoveWidget(panel->icorB, contentW - 105, contentH - 30);
+	}
+
+	if (panel->pixF) {
+		WMResizeWidget(panel->pixF, contentW, contentH);
+		if (panel->pixL)
+			WMResizeWidget(panel->pixL, contentW - 20, contentH - 45);
+		if (panel->pixaB)
+			WMMoveWidget(panel->pixaB, contentW - 210, contentH - 30);
+		if (panel->pixrB)
+			WMMoveWidget(panel->pixrB, contentW - 105, contentH - 30);
+	}
+}
+
+static void resizePaths(Panel *p)
+{
+	layoutPathsPanel((_Panel *) p);
 }
 
 Panel *InitPaths(WMWidget *parent)
@@ -320,6 +375,7 @@ Panel *InitPaths(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizePaths;
 
 	AddSection(panel, ICON_FILE);
 

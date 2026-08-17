@@ -46,6 +46,8 @@ typedef struct WDock {
     unsigned int auto_raise_lower:1;   /* if clip should raise/lower when
                                         * entered/leaved */
     unsigned int on_right_side:1;
+    unsigned int is_horizontal:1;
+    unsigned int on_bottom_side:1;
     unsigned int collapsed:1;
     unsigned int mapped:1;
     unsigned int lowered:1;

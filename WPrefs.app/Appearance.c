@@ -244,6 +244,7 @@ static void changeColorPage(WMWidget * w, void *data);
 static void OpenExtractPanelFor(_Panel *panel);
 
 static void changedTabItem(struct WMTabViewDelegate *self, WMTabView * tabView, WMTabViewItem * item);
+static void layoutAppearancePanel(_Panel *panel);
 
 static WMTabViewDelegate tabviewDelegate = {
 	NULL,
@@ -2103,6 +2104,8 @@ static void createPanel(Panel * p)
 	fillColorList(panel);
 
 	panel->texturePanel = CreateTexturePanel(panel->parent);
+
+	layoutAppearancePanel(panel);
 }
 
 static void setupTextureFor(WMList *list, const char *key, const char *defValue, const char *title, int index)
@@ -2265,6 +2268,63 @@ static void prepareForClose(_Panel * panel)
 	WMSynchronizeUserDefaults(udb);
 }
 
+static void layoutAppearancePanel(_Panel *panel)
+{
+	int boxWidth, boxHeight;
+	int leftW, rightW, panelH;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	boxHeight = WMWidgetHeight(panel->box);
+
+	leftW = (boxWidth - 35) / 2;
+	if (leftW < 240)
+		leftW = 240;
+	rightW = boxWidth - leftW - 35;
+	if (rightW < 245)
+		rightW = 245;
+
+	panelH = boxHeight - 20;
+	if (panelH < FRAME_HEIGHT - 20)
+		panelH = FRAME_HEIGHT - 20;
+
+	if (panel->prevL) {
+		WMResizeWidget(panel->prevL, leftW, panelH);
+		WMMoveWidget(panel->prevL, 15, 10);
+	}
+
+	if (panel->tabv) {
+		WMResizeWidget(panel->tabv, rightW, panelH);
+		WMMoveWidget(panel->tabv, 15 + leftW + 10, 10);
+	}
+
+	if (panel->texF) {
+		if (panel->secP)
+			WMResizeWidget(panel->secP, rightW - 17, 20);
+		if (panel->texLs)
+			WMResizeWidget(panel->texLs, rightW - 80, panelH - 50);
+	}
+
+	if (panel->colF) {
+		if (panel->colP)
+			WMResizeWidget(panel->colP, rightW - 17, 20);
+	}
+
+	if (panel->optF) {
+		if (panel->mstyF)
+			WMResizeWidget(panel->mstyF, rightW - 30, 85);
+		if (panel->taliF)
+			WMResizeWidget(panel->taliF, rightW - 30, 80);
+	}
+}
+
+static void resizeAppearance(Panel *p)
+{
+	layoutAppearancePanel((_Panel *) p);
+}
+
 Panel *InitAppearance(WMWidget *parent)
 {
 	_Panel *panel;
@@ -2280,6 +2340,7 @@ Panel *InitAppearance(WMWidget *parent)
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
 	panel->callbacks.prepareForClose = prepareForClose;
+	panel->callbacks.resizePanel = resizeAppearance;
 
 	AddSection(panel, ICON_FILE);
 

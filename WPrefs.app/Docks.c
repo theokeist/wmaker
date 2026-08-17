@@ -51,6 +51,9 @@ static const struct {
 	  N_("Disable/enable Drawers (a dock that stores\napplication icons horizontally). The dock is required.") }
 };
 
+typedef struct _Panel _Panel;
+static void layoutDocksPanel(_Panel *panel);
+
 typedef struct _Panel {
 	WMBox *box;
 
@@ -70,6 +73,9 @@ typedef struct _Panel {
 
 	WMFrame *dockF;
 	WMButton *docksB[wlengthof_nocheck(dock_config)];
+
+	WMFrame *orientF;
+	WMPopUpButton *orientP;
 } _Panel;
 
 #define ICON_FILE	"dockclipdrawersection"
@@ -269,6 +275,22 @@ static void createPanel(Panel *p)
 
 	WMMapSubwidgets(panel->dockF);
 
+	/***************** Dock Placement / Orientation *****************/
+	panel->orientF = WMCreateFrame(panel->box);
+	WMResizeWidget(panel->orientF, 125, 52);
+	WMMoveWidget(panel->orientF, 394, 225);
+	WMSetFrameTitle(panel->orientF, _("Dock Placement"));
+
+	panel->orientP = WMCreatePopUpButton(panel->orientF);
+	WMResizeWidget(panel->orientP, 105, 20);
+	WMMoveWidget(panel->orientP, 10, 20);
+	WMAddPopUpButtonItem(panel->orientP, _("Vertical (Sides)"));
+	WMAddPopUpButtonItem(panel->orientP, _("Horizontal (Top)"));
+	WMAddPopUpButtonItem(panel->orientP, _("Horizontal (Bottom)"));
+	WMSetBalloonTextForView(_("Choose whether the dock is placed vertically on the screen sides or horizontally at the top/bottom."), WMWidgetView(panel->orientF));
+
+	WMMapSubwidgets(panel->orientF);
+
 	if (xis)
 		RReleaseImage(xis);
 
@@ -276,6 +298,48 @@ static void createPanel(Panel *p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutDocksPanel(panel);
+}
+
+static void layoutDocksPanel(_Panel *panel)
+{
+	int boxWidth;
+	int rightW, leftW;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	rightW = 145;
+	leftW = boxWidth - rightW - 30;
+	if (leftW < 340)
+		leftW = 340;
+
+	if (panel->autoDelayF[0]) {
+		WMResizeWidget(panel->autoDelayF[0], leftW, 100);
+		WMMoveWidget(panel->autoDelayF[0], 11, 10);
+	}
+	if (panel->autoDelayF[1]) {
+		WMResizeWidget(panel->autoDelayF[1], leftW, 100);
+		WMMoveWidget(panel->autoDelayF[1], 11, 120);
+	}
+	if (panel->dockF) {
+		WMMoveWidget(panel->dockF, 11 + leftW + 10, 10);
+		WMResizeWidget(panel->dockF, rightW, 160);
+	}
+	if (panel->orientF) {
+		WMMoveWidget(panel->orientF, 11 + leftW + 10, 175);
+		WMResizeWidget(panel->orientF, rightW, 50);
+		if (panel->orientP) {
+			WMResizeWidget(panel->orientP, rightW - 20, 20);
+			WMMoveWidget(panel->orientP, 10, 18);
+		}
+	}
+}
+
+static void resizeDocks(Panel *p)
+{
+	layoutDocksPanel((_Panel *) p);
 }
 
 static void storeData(_Panel *panel)
@@ -293,6 +357,19 @@ static void storeData(_Panel *panel)
 	{
 		SetBoolForKey(!WMGetButtonSelected(panel->docksB[i]), dock_config[i].disable_key);
 	}
+	if (panel->orientP) {
+		int pos = WMGetPopUpButtonSelectedItem(panel->orientP);
+		if (pos == 1) {
+			SetBoolForKey(True, "HorizontalDock");
+			SetStringForKey("top", "DockPosition");
+		} else if (pos == 2) {
+			SetBoolForKey(True, "HorizontalDock");
+			SetStringForKey("bottom", "DockPosition");
+		} else {
+			SetBoolForKey(False, "HorizontalDock");
+			SetStringForKey("normal", "DockPosition");
+		}
+	}
 }
 
 static void showData(_Panel *panel)
@@ -308,6 +385,19 @@ static void showData(_Panel *panel)
 	for (i = 0; i < wlengthof(dock_config); i++)
 	{
 		WMSetButtonSelected(panel->docksB[i], !GetBoolForKey(dock_config[i].disable_key));
+	}
+	if (panel->orientP) {
+		char *pos = GetStringForKey("DockPosition");
+		Bool horiz = GetBoolForKey("HorizontalDock");
+
+		if (pos && strcasecmp(pos, "top") == 0)
+			WMSetPopUpButtonSelectedItem(panel->orientP, 1);
+		else if (pos && strcasecmp(pos, "bottom") == 0)
+			WMSetPopUpButtonSelectedItem(panel->orientP, 2);
+		else if (horiz)
+			WMSetPopUpButtonSelectedItem(panel->orientP, 1);
+		else
+			WMSetPopUpButtonSelectedItem(panel->orientP, 0);
 	}
 }
 
@@ -327,6 +417,7 @@ Panel *InitDocks(WMWidget *parent)
 
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
+	panel->callbacks.resizePanel = resizeDocks;
 
 	AddSection(panel, ICON_FILE);
 

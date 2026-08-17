@@ -53,6 +53,8 @@ typedef struct _Panel {
 	char hotcornerDelaySelected;
 } _Panel;
 
+static void layoutHotCornerShortcutsPanel(_Panel *panel);
+
 #define ICON_FILE	"hotcorners"
 
 #define DELAY_ICON "timer%i"
@@ -432,7 +434,56 @@ static void createPanel(Panel * p)
 	WMMapSubwidgets(panel->box);
 
 	showData(panel);
+	layoutHotCornerShortcutsPanel(panel);
 }
+
+static void layoutHotCornerShortcutsPanel(_Panel *panel)
+{
+	int boxWidth;
+	int colW;
+	int i;
+
+	if (!panel || !panel->box)
+		return;
+
+	boxWidth = WMWidgetWidth(panel->box);
+	colW = (boxWidth - 35) / 2;
+	if (colW < 240)
+		colW = 240;
+
+	if (panel->hcF) {
+		WMResizeWidget(panel->hcF, colW, 53);
+		WMMoveWidget(panel->hcF, 15, 17);
+	}
+	if (panel->hceF) {
+		WMResizeWidget(panel->hceF, colW, 40);
+		WMMoveWidget(panel->hceF, 15, 77);
+	}
+	if (panel->hcdescF) {
+		WMResizeWidget(panel->hcdescF, colW, 95);
+		WMMoveWidget(panel->hcdescF, 15, 130);
+		if (panel->hcdescL)
+			WMResizeWidget(panel->hcdescL, colW - 40, 70);
+	}
+	if (panel->hcdelayF) {
+		WMMoveWidget(panel->hcdelayF, 15 + colW + 10, 10);
+		WMResizeWidget(panel->hcdelayF, colW, 60);
+	}
+	if (panel->hcactionsF) {
+		WMMoveWidget(panel->hcactionsF, 15 + colW + 10, 77);
+		WMResizeWidget(panel->hcactionsF, colW, 148);
+		for (i = 0; i < 4; i++) {
+			if (panel->hcactionsT[i])
+				WMResizeWidget(panel->hcactionsT[i], colW - 65, 20);
+		}
+	}
+}
+
+static void resizeHotCornerShortcuts(Panel *p)
+{
+	layoutHotCornerShortcutsPanel((_Panel *) p);
+}
+
 static void prepareForClose(_Panel *panel)
 {
 	int i;
@@ -457,6 +508,7 @@ Panel *InitHotCornerShortcuts(WMWidget *parent)
 	panel->callbacks.createWidgets = createPanel;
 	panel->callbacks.updateDomain = storeData;
 	panel->callbacks.prepareForClose = prepareForClose;
+	panel->callbacks.resizePanel = resizeHotCornerShortcuts;
 
 	AddSection(panel, ICON_FILE);
 

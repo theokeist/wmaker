@@ -352,7 +352,9 @@ static void layoutSectionButtons(void)
         if (contentWidth < availableWidth)
                 contentWidth = availableWidth;
 
-        WMResizeWidget(WPrefs.buttonF, contentWidth, NAV_BUTTON_SIZE);
+        const int navHeight = NAV_BUTTON_SIZE + NAV_SCROLL_PADDING;
+
+        WMResizeWidget(WPrefs.buttonF, contentWidth, navHeight);
 
         if (WPrefs.sectionCount > 0) {
                 startX = (contentWidth - totalButtonWidth) / 2;
@@ -528,6 +530,13 @@ static void updateMainWindowLayout(void)
         WMMoveWidget(WPrefs.undosBtn, x, buttonY);
 
         layoutSectionButtons();
+
+        if (WPrefs.currentPanel) {
+                PanelRec *rec = (PanelRec *) WPrefs.currentPanel;
+                if ((rec->callbacks.flags & INITIALIZED_PANEL) && rec->callbacks.resizePanel) {
+                        (*rec->callbacks.resizePanel)(WPrefs.currentPanel);
+                }
+        }
 }
 
 static void handleMainWindowResize(void *self, WMNotification *notif)
@@ -556,6 +565,9 @@ static void showPanel(Panel * panel)
 
 	if (rec->callbacks.showPanel)
 		(*rec->callbacks.showPanel) (panel);
+
+	if (rec->callbacks.resizePanel)
+		(*rec->callbacks.resizePanel) (panel);
 
 	WMMapWidget(rec->box);
 }
@@ -687,44 +699,23 @@ void CreateImages(WMScreen *scr, RContext *rc, RImage *xis, const char *file,
 void SetButtonAlphaImage(WMScreen *scr, WMButton *bPtr, const char *file)
 {
 	WMPixmap *icon;
-	RColor color;
 	char *iconPath;
 
 	iconPath = LocateImage(file);
-
-	color.red = 0xae;
-	color.green = 0xaa;
-	color.blue = 0xae;
-	color.alpha = 0;
 	if (iconPath) {
-		icon = WMCreateBlendedPixmapFromFile(scr, iconPath, &color);
+		icon = WMCreatePixmapFromFile(scr, iconPath);
 		if (!icon)
 			wwarning(_("could not load icon file %s"), iconPath);
+		wfree(iconPath);
 	} else {
 		icon = NULL;
 	}
 
 	WMSetButtonImage(bPtr, icon);
-
-	color.red = 0xff;
-	color.green = 0xff;
-	color.blue = 0xff;
-	color.alpha = 0;
-	if (iconPath) {
-		icon = WMCreateBlendedPixmapFromFile(scr, iconPath, &color);
-		if (!icon)
-			wwarning(_("could not load icon file %s"), iconPath);
-	} else {
-		icon = NULL;
-	}
-
 	WMSetButtonAltImage(bPtr, icon);
 
 	if (icon)
 		WMReleasePixmap(icon);
-
-	if (iconPath)
-		wfree(iconPath);
 }
 
 void AddSection(Panel * panel, const char *iconFile)

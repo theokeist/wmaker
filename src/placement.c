@@ -120,10 +120,17 @@ void PlaceIcon(WScreen *scr, int *x_ret, int *y_ret, int head)
 	if (scr->dock) {
 		int offset = wPreferences.icon_size + DOCK_EXTRA_SPACE;
 
-		if (scr->dock->on_right_side)
-			area.x2 -= offset;
-		else
-		    area.x1 += offset;
+		if (scr->dock->is_horizontal) {
+			if (scr->dock->on_bottom_side)
+				area.y2 -= offset;
+			else
+				area.y1 += offset;
+		} else {
+			if (scr->dock->on_right_side)
+				area.x2 -= offset;
+			else
+				area.x1 += offset;
+		}
 	}
 
 	/* Find out screen boundaries. */

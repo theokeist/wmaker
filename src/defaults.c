@@ -154,6 +154,7 @@ static WDECallbackUpdate setModifierShortKeyLabels;
 static WDECallbackUpdate setHotCornerActions;
 
 static WDECallbackConvert getCursor;
+static WDECallbackConvert getDockPosition;
 static WDECallbackUpdate setCursor;
 static WDECallbackUpdate updateDock;
 static WDECallbackUpdate updateDockOpacity;
@@ -559,6 +560,12 @@ WDefaultEntry optionList[] = {
 	    &wPreferences.ignore_gtk_decoration_hints, getBool, NULL, NULL, NULL},
 	{"KeepDockOnPrimaryHead", "NO", NULL,
 	    &wPreferences.keep_dock_on_primary_head, getBool, updateDock,
+	    NULL, NULL},
+	{"HorizontalDock", "NO", NULL,
+	    &wPreferences.horizontal_dock, getBool, updateDock,
+	    NULL, NULL},
+	{"DockPosition", "normal", NULL,
+	    &wPreferences.dock_position, getDockPosition, updateDock,
 	    NULL, NULL},
 #ifdef USE_RANDR
 	{"HotplugMonitor", "NO", NULL,
@@ -3841,14 +3848,53 @@ static int setCursor(WScreen * scr, WDefaultEntry * entry, void *tdata, void *ex
 	return 0;
 }
 
+static int getDockPosition(WScreen *scr, WDefaultEntry *entry, WMPropList *value, void *addr, void **tdata)
+{
+	(void) scr;
+	(void) entry;
+	(void) tdata;
+	char *str;
+
+	if (!WMIsPLString(value))
+		return False;
+
+	str = WMGetFromPLString(value);
+	if (strcasecmp(str, "top") == 0) {
+		wPreferences.horizontal_dock = 1;
+		*(char *)addr = 2; /* top */
+	} else if (strcasecmp(str, "bottom") == 0) {
+		wPreferences.horizontal_dock = 1;
+		*(char *)addr = 3; /* bottom */
+	} else if (strcasecmp(str, "left") == 0) {
+		wPreferences.horizontal_dock = 0;
+		*(char *)addr = 1; /* left */
+	} else {
+		/* right / normal */
+		wPreferences.horizontal_dock = 0;
+		*(char *)addr = 0; /* right */
+	}
+	return True;
+}
+
 static int updateDock(WScreen * scr, WDefaultEntry * entry,
 			      void *tdata, void *extra_data) {
 	(void) entry;
 	(void) tdata;
 	(void) extra_data;
 
-	if (scr->dock)
+	if (scr->dock) {
+		scr->dock->is_horizontal = wPreferences.horizontal_dock;
+		if (wPreferences.dock_position == 3)
+			scr->dock->on_bottom_side = 1;
+		else if (wPreferences.dock_position == 2)
+			scr->dock->on_bottom_side = 0;
+		else if (wPreferences.dock_position == 1)
+			scr->dock->on_right_side = 0;
+		else if (wPreferences.dock_position == 0)
+			scr->dock->on_right_side = 1;
+
 		wDockSwap(scr->dock);
+	}
 
 	return 0;
 }
