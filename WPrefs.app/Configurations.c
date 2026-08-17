@@ -425,10 +425,26 @@ static void layoutConfigurationsPanel(_Panel *panel)
 	if (panel->smoF) {
 		WMMoveWidget(panel->smoF, 15 + colW + 10, 10);
 		WMResizeWidget(panel->smoF, colW, 100);
+		if (panel->smoB)
+			WMResizeWidget(panel->smoB, colW - 30, 20);
+		if (panel->supB)
+			WMResizeWidget(panel->supB, colW - 30, 20);
 	}
 	if (panel->dithF) {
 		WMMoveWidget(panel->dithF, 15 + colW + 10, 120);
 		WMResizeWidget(panel->dithF, colW, 97);
+		if (panel->dithB)
+			WMResizeWidget(panel->dithB, colW - 30, 32);
+		if (panel->dith2L)
+			WMMoveWidget(panel->dith2L, colW - 90, 50);
+		if (panel->dithS) {
+			int sw = colW - 180;
+			if (sw < 95) sw = 95;
+			WMResizeWidget(panel->dithS, sw, 16);
+			WMMoveWidget(panel->dithS, (colW - sw) / 2, 65);
+			if (panel->dithL)
+				WMMoveWidget(panel->dithL, (colW - 75) / 2, 50);
+		}
 	}
 }
 

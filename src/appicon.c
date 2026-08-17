@@ -377,6 +377,8 @@ void wAppIconMove(WAppIcon * aicon, int x, int y)
 	XMoveWindow(dpy, aicon->icon->core->window, x, y);
 	aicon->x_pos = x;
 	aicon->y_pos = y;
+	if (wPreferences.transparent_tile_only && wPreferences.dock_opacity < 100)
+		wIconUpdate(aicon->icon);
 }
 
 #ifdef WS_INDICATOR

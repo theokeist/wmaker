@@ -561,6 +561,11 @@ static void showPanel(Panel * panel)
 		rec->callbacks.flags |= INITIALIZED_PANEL;
 	}
 
+	if (rec->box) {
+		WMResizeWidget(rec->box, WMWidgetWidth(WPrefs.banner), WMWidgetHeight(WPrefs.banner));
+		WMMoveWidget(rec->box, 0, 0);
+	}
+
 	WMSetWindowTitle(WPrefs.win, rec->sectionName);
 
 	if (rec->callbacks.showPanel)

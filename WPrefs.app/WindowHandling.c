@@ -615,6 +615,8 @@ static void layoutWindowHandlingPanel(_Panel *panel)
 {
 	int boxWidth, boxHeight;
 	int scrollWidth, scrollHeight;
+	int contentW;
+	int col1W, col2W, col3W;
 
 	if (!panel || !panel->box)
 		return;
@@ -629,12 +631,53 @@ static void layoutWindowHandlingPanel(_Panel *panel)
 	if (scrollHeight < 200)
 		scrollHeight = 200;
 
+	contentW = scrollWidth - 16;
+	if (contentW < 520)
+		contentW = 520;
+
 	if (panel->scrollV) {
 		WMResizeWidget(panel->scrollV, scrollWidth, scrollHeight);
 		WMMoveWidget(panel->scrollV, 8, 8);
 	}
 	if (panel->contentB) {
-		WMResizeWidget(panel->contentB, scrollWidth - 16, WINDOW_HANDLING_CONTENT_HEIGHT);
+		WMResizeWidget(panel->contentB, contentW, WINDOW_HANDLING_CONTENT_HEIGHT);
+	}
+
+	col1W = (contentW - 32) * 44 / 100;
+	if (col1W < 220)
+		col1W = 220;
+	col2W = (contentW - 32 - col1W) / 2;
+	if (col2W < 130)
+		col2W = 130;
+	col3W = contentW - 32 - col1W - col2W;
+	if (col3W < 140)
+		col3W = 140;
+
+	if (panel->placF) {
+		WMResizeWidget(panel->placF, col1W, 163);
+		WMMoveWidget(panel->placF, 8, 6);
+	}
+	if (panel->resF) {
+		WMResizeWidget(panel->resF, col2W, 92);
+		WMMoveWidget(panel->resF, 8 + col1W + 8, 6);
+	}
+	if (panel->resizeF) {
+		WMResizeWidget(panel->resizeF, col2W, 66);
+		WMMoveWidget(panel->resizeF, 8 + col1W + 8, 103);
+	}
+	if (panel->maxiF) {
+		WMResizeWidget(panel->maxiF, col3W, 92);
+		WMMoveWidget(panel->maxiF, 8 + col1W + 8 + col2W + 8, 6);
+	}
+	if (panel->opaqF) {
+		WMResizeWidget(panel->opaqF, col3W, 118);
+		WMMoveWidget(panel->opaqF, 8 + col1W + 8 + col2W + 8, 103);
+	}
+	if (panel->dragmaxF) {
+		WMResizeWidget(panel->dragmaxF, contentW - 16, 49);
+		WMMoveWidget(panel->dragmaxF, 8, 226);
+		if (panel->dragmaxP)
+			WMResizeWidget(panel->dragmaxP, contentW - 46, 20);
 	}
 }
 

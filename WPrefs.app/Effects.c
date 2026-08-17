@@ -844,6 +844,13 @@ static void createPanel(Panel *p)
                                   WMWidgetView(panel->box));
 }
 
+static void resizeEffects(Panel *p)
+{
+        _Panel *panel = (_Panel *)p;
+
+        layout_effects_panel(panel);
+}
+
 Panel *InitEffects(WMWidget *parent)
 {
         _Panel *panel;
@@ -861,6 +868,7 @@ Panel *InitEffects(WMWidget *parent)
         panel->callbacks.undoChanges = undo;
         panel->callbacks.prepareForClose = prepareForClose;
         panel->callbacks.showPanel = showEffectsPanel;
+        panel->callbacks.resizePanel = resizeEffects;
 
         AddSection((Panel *)panel, ICON_FILE);
 

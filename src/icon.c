@@ -22,6 +22,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <X11/extensions/shape.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -254,6 +255,71 @@ static void drawIconTitleBackground(WScreen *scr, Pixmap pixmap, int height)
 		  wPreferences.icon_size - 1, 0, wPreferences.icon_size - 1, height + 1);
 }
 
+static RImage *getRootBackgroundSample(WScreen *scr, WIcon *icon)
+{
+	int ix = 0, iy = 0;
+	Window child = None;
+	XImage *root_ximg = NULL;
+	RImage *root_bg = NULL;
+	Atom prop, type;
+	int format;
+	unsigned long nitems, bytes_after;
+	unsigned char *data = NULL;
+	Pixmap root_pmap = None;
+
+	if (!scr || !icon)
+		return NULL;
+
+	if (icon->core && icon->core->window != None)
+		XTranslateCoordinates(dpy, icon->core->window, scr->root_win, 0, 0, &ix, &iy, &child);
+	else if (icon->owner) {
+		ix = icon->owner->icon_x;
+		iy = icon->owner->icon_y;
+	}
+
+	if (ix < 0 || iy < 0 || ix + (int)wPreferences.icon_size > scr->scr_width ||
+	    iy + (int)wPreferences.icon_size > scr->scr_height)
+		return NULL;
+
+	/* Try to grab from _XROOTPMAP_ID or ESETROOT_PMAP_ID */
+	prop = XInternAtom(dpy, "_XROOTPMAP_ID", False);
+	if (prop != None && XGetWindowProperty(dpy, scr->root_win, prop, 0, 1, False, XA_PIXMAP,
+	                                       &type, &format, &nitems, &bytes_after, &data) == Success && data) {
+		root_pmap = *(Pixmap *)data;
+		XFree(data);
+		data = NULL;
+	}
+
+	if (root_pmap == None) {
+		prop = XInternAtom(dpy, "ESETROOT_PMAP_ID", False);
+		if (prop != None && XGetWindowProperty(dpy, scr->root_win, prop, 0, 1, False, XA_PIXMAP,
+		                                       &type, &format, &nitems, &bytes_after, &data) == Success && data) {
+			root_pmap = *(Pixmap *)data;
+			XFree(data);
+			data = NULL;
+		}
+	}
+
+	if (root_pmap != None) {
+		root_ximg = XGetImage(dpy, root_pmap, ix, iy,
+		                      wPreferences.icon_size, wPreferences.icon_size,
+		                      AllPlanes, ZPixmap);
+	}
+
+	if (!root_ximg) {
+		root_ximg = XGetImage(dpy, scr->root_win, ix, iy,
+		                      wPreferences.icon_size, wPreferences.icon_size,
+		                      AllPlanes, ZPixmap);
+	}
+
+	if (root_ximg) {
+		root_bg = RCreateImageFromXImage(scr->rcontext, root_ximg, NULL);
+		XDestroyImage(root_ximg);
+	}
+
+	return root_bg;
+}
+
 static void icon_update_pixmap(WIcon *icon, RImage *image)
 {
 	RImage *tile;
@@ -285,30 +351,19 @@ static void icon_update_pixmap(WIcon *icon, RImage *image)
 
 	if (wPreferences.transparent_tile_only && wPreferences.dock_opacity < 100 &&
 	    (icon->tile_type == TILE_NORMAL || icon->tile_type == TILE_CLIP || icon->tile_type == TILE_DRAWER)) {
-		int ix = 0, iy = 0;
-		Window child = None;
-
-		if (icon->core && icon->core->window != None)
-			XTranslateCoordinates(dpy, icon->core->window, scr->root_win, 0, 0, &ix, &iy, &child);
-		else if (icon->owner) {
-			ix = icon->owner->icon_x;
-			iy = icon->owner->icon_y;
-		}
-
-		if (ix >= 0 && iy >= 0 && ix + (int)wPreferences.icon_size <= scr->scr_width &&
-		    iy + (int)wPreferences.icon_size <= scr->scr_height) {
-			XImage *root_ximg = XGetImage(dpy, scr->root_win, ix, iy,
-			                              wPreferences.icon_size, wPreferences.icon_size,
-			                              AllPlanes, ZPixmap);
-			if (root_ximg) {
-				RImage *root_bg = RCreateImageFromXImage(scr->rcontext, root_ximg, NULL);
-				XDestroyImage(root_ximg);
-				if (root_bg) {
-					int opaq = (wPreferences.dock_opacity * 255) / 100;
-					RCombineImagesWithOpaqueness(root_bg, tile, opaq);
-					RReleaseImage(tile);
-					tile = root_bg;
-				}
+		RImage *root_bg = getRootBackgroundSample(scr, icon);
+		if (root_bg) {
+			int opaq = (wPreferences.dock_opacity * 255) / 100;
+			if (opaq > 0)
+				RCombineImagesWithOpaqueness(root_bg, tile, opaq);
+			RReleaseImage(tile);
+			tile = root_bg;
+		} else if (wPreferences.dock_opacity == 0) {
+			RImage *rgba_tile = RCreateImage(wPreferences.icon_size, wPreferences.icon_size, 1);
+			if (rgba_tile) {
+				RClearImage(rgba_tile, &(RColor){0, 0, 0, 0});
+				RReleaseImage(tile);
+				tile = rgba_tile;
 			}
 		}
 	}
