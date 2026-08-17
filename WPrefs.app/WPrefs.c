@@ -830,6 +830,20 @@ void Initialize(WMScreen * scr)
 #endif
 	InitExpert(WPrefs.banner);
 
+	{
+		int fullTabsWidth = (NAV_BUTTON_SIZE * WPrefs.sectionCount) + (MAIN_WINDOW_SIDE_MARGIN * 2);
+		int screenW = WidthOfScreen(DefaultScreenOfDisplay(WMScreenDisplay(scr)));
+		int targetWidth = fullTabsWidth;
+
+		if (screenW > 0 && targetWidth > screenW - 40)
+			targetWidth = screenW - 40;
+		if (targetWidth < FRAME_WIDTH + (MAIN_WINDOW_SIDE_MARGIN * 2))
+			targetWidth = FRAME_WIDTH + (MAIN_WINDOW_SIDE_MARGIN * 2);
+
+		WMResizeWidget(WPrefs.win, targetWidth, INITIAL_WINDOW_HEIGHT);
+		updateMainWindowLayout();
+	}
+
 	WMRealizeWidget(WPrefs.scrollV);
 
 	WMSetLabelText(WPrefs.statusL, "");
