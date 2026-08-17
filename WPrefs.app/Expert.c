@@ -136,6 +136,8 @@ static struct expert_option {
 	{ N_("Automatically (de)activate monitors on hotplug events."),
 	  /* default: */ False, OPTION_WMAKER, "HotplugMonitor"},
 #endif
+	{ N_("Transparent dock tile only (preserves application icon opacity)."),
+	  /* default: */ True, OPTION_WMAKER, "TransparentTileOnly"},
 };
 
 

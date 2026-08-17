@@ -371,7 +371,7 @@ static void layoutSectionButtons(void)
         if (needsScroll) {
                 WMScroller *scroller = WMGetScrollViewHorizontalScroller(WPrefs.scrollV);
                 if (scroller)
-                        WMSetScrollerArrowsPosition(scroller, WSANone);
+                        WMSetScrollerArrowsPosition(scroller, WSAMaxEnd);
         }
 
         if (WPrefs.win) {

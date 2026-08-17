@@ -56,6 +56,7 @@ typedef struct _Panel {
         WMLabel *dockOpacityL;
         WMSlider *dockOpacityS;
         WMLabel *dockOpacityValueL;
+        WMButton *tileOnlyB;
 
         int compositorIndex;
         char *configPath;
@@ -442,6 +443,8 @@ static void showData(_Panel *panel)
         WMSetSliderValue(panel->dockOpacityS, opacity);
         updateDockOpacityLabel(panel);
 
+        WMSetButtonSelected(panel->tileOnlyB, GetBoolForKey("TransparentTileOnly"));
+
         str = GetStringForKey("CompositorConfigPath");
         if (!str || !str[0])
                 str = default_path_for_index(index);
@@ -475,6 +478,7 @@ static void storeData(_Panel *panel)
                 RemoveObjectForKey("CompositorConfigPath");
 
         SetIntegerForKey(WMGetSliderValue(panel->dockOpacityS), "DockOpacity");
+        SetBoolForKey(WMGetButtonSelected(panel->tileOnlyB), "TransparentTileOnly");
 
         SetBoolForKey(WMGetButtonSelected(panel->shadowB), "EnableWindowShadows");
 }
@@ -650,6 +654,11 @@ static void layout_effects_panel(_Panel *panel)
 
         compY += rowHeight + spacing;
 
+        WMResizeWidget(panel->tileOnlyB, availableWidth, 28);
+        WMMoveWidget(panel->tileOnlyB, innerMargin, compY);
+
+        compY += 28 + spacing;
+
         WMResizeWidget(panel->configPathL, availableWidth, 48);
         WMMoveWidget(panel->configPathL, innerMargin, compY);
 
@@ -801,6 +810,10 @@ static void createPanel(Panel *p)
 
         panel->dockOpacityValueL = WMCreateLabel(panel->compositorF);
         WMSetLabelTextAlignment(panel->dockOpacityValueL, WARight);
+
+        panel->tileOnlyB = WMCreateSwitchButton(panel->compositorF);
+        WMSetButtonText(panel->tileOnlyB,
+                        _("Transparent tile only (keeps application icon fully opaque)"));
 
         panel->hintL = WMCreateLabel(panel->compositorF);
         WMResizeWidget(panel->hintL, FRAME_WIDTH - 210, 60);

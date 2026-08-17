@@ -454,6 +454,8 @@ WDefaultEntry optionList[] = {
             &wPreferences.autostart_compositor, getBool, NULL, NULL, NULL},
         {"DockOpacity", "100", NULL,
             &wPreferences.dock_opacity, getInt, updateDockOpacity, NULL, NULL},
+        {"TransparentTileOnly", "YES", NULL,
+            &wPreferences.transparent_tile_only, getBool, updateDockOpacity, NULL, NULL},
         {"ShowWindowContentsDuringAnimations", "NO", NULL,
             &wPreferences.show_window_contents_in_animations, getBool, NULL, NULL, NULL},
 	{"ShadeSpeed", "fast", seSpeeds,

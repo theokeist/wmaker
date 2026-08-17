@@ -469,6 +469,7 @@ extern struct WPreferences {
         char enable_window_shadows;
         char autostart_compositor;
         int dock_opacity;              /* opacity of dock icons [0..100] */
+        char transparent_tile_only;    /* transparent only tile, keeping icon opaque */
 
         /* shading animation */
         signed char shade_speed;

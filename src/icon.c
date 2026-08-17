@@ -283,6 +283,36 @@ static void icon_update_pixmap(WIcon *icon, RImage *image)
 		tile = RCloneImage(scr->icon_tile);
 	}
 
+	if (wPreferences.transparent_tile_only && wPreferences.dock_opacity < 100 &&
+	    (icon->tile_type == TILE_NORMAL || icon->tile_type == TILE_CLIP || icon->tile_type == TILE_DRAWER)) {
+		int ix = 0, iy = 0;
+		Window child = None;
+
+		if (icon->core && icon->core->window != None)
+			XTranslateCoordinates(dpy, icon->core->window, scr->root_win, 0, 0, &ix, &iy, &child);
+		else if (icon->owner) {
+			ix = icon->owner->icon_x;
+			iy = icon->owner->icon_y;
+		}
+
+		if (ix >= 0 && iy >= 0 && ix + (int)wPreferences.icon_size <= scr->scr_width &&
+		    iy + (int)wPreferences.icon_size <= scr->scr_height) {
+			XImage *root_ximg = XGetImage(dpy, scr->root_win, ix, iy,
+			                              wPreferences.icon_size, wPreferences.icon_size,
+			                              AllPlanes, ZPixmap);
+			if (root_ximg) {
+				RImage *root_bg = RCreateImageFromXImage(scr->rcontext, root_ximg, NULL);
+				XDestroyImage(root_ximg);
+				if (root_bg) {
+					int opaq = (wPreferences.dock_opacity * 255) / 100;
+					RCombineImagesWithOpaqueness(root_bg, tile, opaq);
+					RReleaseImage(tile);
+					tile = root_bg;
+				}
+			}
+		}
+	}
+
 	if (image) {
 		w = (image->width > wPreferences.icon_size)
 		    ? wPreferences.icon_size : image->width;

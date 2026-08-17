@@ -76,6 +76,7 @@ typedef struct _Panel {
 
 	WMFrame *orientF;
 	WMPopUpButton *orientP;
+	WMButton *tileOnlyB;
 } _Panel;
 
 #define ICON_FILE	"dockclipdrawersection"
@@ -277,17 +278,23 @@ static void createPanel(Panel *p)
 
 	/***************** Dock Placement / Orientation *****************/
 	panel->orientF = WMCreateFrame(panel->box);
-	WMResizeWidget(panel->orientF, 125, 52);
-	WMMoveWidget(panel->orientF, 394, 225);
-	WMSetFrameTitle(panel->orientF, _("Dock Placement"));
+	WMResizeWidget(panel->orientF, 185, 80);
+	WMMoveWidget(panel->orientF, 394, 215);
+	WMSetFrameTitle(panel->orientF, _("Dock Placement & Style"));
 
 	panel->orientP = WMCreatePopUpButton(panel->orientF);
-	WMResizeWidget(panel->orientP, 105, 20);
+	WMResizeWidget(panel->orientP, 165, 20);
 	WMMoveWidget(panel->orientP, 10, 20);
 	WMAddPopUpButtonItem(panel->orientP, _("Vertical (Sides)"));
 	WMAddPopUpButtonItem(panel->orientP, _("Horizontal (Top)"));
 	WMAddPopUpButtonItem(panel->orientP, _("Horizontal (Bottom)"));
-	WMSetBalloonTextForView(_("Choose whether the dock is placed vertically on the screen sides or horizontally at the top/bottom."), WMWidgetView(panel->orientF));
+	WMSetBalloonTextForView(_("Choose whether the dock is placed vertically on the screen sides or horizontally at the top/bottom."), WMWidgetView(panel->orientP));
+
+	panel->tileOnlyB = WMCreateSwitchButton(panel->orientF);
+	WMResizeWidget(panel->tileOnlyB, 165, 22);
+	WMMoveWidget(panel->tileOnlyB, 10, 48);
+	WMSetButtonText(panel->tileOnlyB, _("Transparent tile only"));
+	WMSetBalloonTextForView(_("When enabled, dock transparency applies only to the background tile, keeping application icons fully opaque."), WMWidgetView(panel->tileOnlyB));
 
 	WMMapSubwidgets(panel->orientF);
 
@@ -310,7 +317,7 @@ static void layoutDocksPanel(_Panel *panel)
 		return;
 
 	boxWidth = WMWidgetWidth(panel->box);
-	rightW = 145;
+	rightW = 195;
 	leftW = boxWidth - rightW - 30;
 	if (leftW < 340)
 		leftW = 340;
@@ -325,14 +332,18 @@ static void layoutDocksPanel(_Panel *panel)
 	}
 	if (panel->dockF) {
 		WMMoveWidget(panel->dockF, 11 + leftW + 10, 10);
-		WMResizeWidget(panel->dockF, rightW, 160);
+		WMResizeWidget(panel->dockF, rightW, 150);
 	}
 	if (panel->orientF) {
-		WMMoveWidget(panel->orientF, 11 + leftW + 10, 175);
-		WMResizeWidget(panel->orientF, rightW, 50);
+		WMMoveWidget(panel->orientF, 11 + leftW + 10, 165);
+		WMResizeWidget(panel->orientF, rightW, 78);
 		if (panel->orientP) {
 			WMResizeWidget(panel->orientP, rightW - 20, 20);
-			WMMoveWidget(panel->orientP, 10, 18);
+			WMMoveWidget(panel->orientP, 10, 20);
+		}
+		if (panel->tileOnlyB) {
+			WMResizeWidget(panel->tileOnlyB, rightW - 20, 22);
+			WMMoveWidget(panel->tileOnlyB, 10, 48);
 		}
 	}
 }
@@ -370,6 +381,8 @@ static void storeData(_Panel *panel)
 			SetStringForKey("normal", "DockPosition");
 		}
 	}
+	if (panel->tileOnlyB)
+		SetBoolForKey(WMGetButtonSelected(panel->tileOnlyB), "TransparentTileOnly");
 }
 
 static void showData(_Panel *panel)
@@ -399,6 +412,8 @@ static void showData(_Panel *panel)
 		else
 			WMSetPopUpButtonSelectedItem(panel->orientP, 0);
 	}
+	if (panel->tileOnlyB)
+		WMSetButtonSelected(panel->tileOnlyB, GetBoolForKey("TransparentTileOnly"));
 }
 
 Panel *InitDocks(WMWidget *parent)

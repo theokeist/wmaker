@@ -201,7 +201,11 @@ static void applyDockOpacityToIcon(WAppIcon *icon)
 	if (!icon || !icon->icon || !icon->icon->core)
 		return;
 
-	setWindowOpacity(icon->icon->core->window, wPreferences.dock_opacity);
+	if (wPreferences.transparent_tile_only) {
+		setWindowOpacity(icon->icon->core->window, 100);
+	} else {
+		setWindowOpacity(icon->icon->core->window, wPreferences.dock_opacity);
+	}
 }
 
 static void applyDockOpacityToDock(WDock *dock)
@@ -3331,6 +3335,33 @@ void wDockApplyOpacity(WScreen *scr)
 
 	for (dc = scr->drawers; dc != NULL; dc = dc->next)
 		applyDockOpacityToDock(dc->adrawer);
+
+	if (wPreferences.transparent_tile_only) {
+		if (scr->dock) {
+			for (i = 0; i < scr->dock->max_icons; i++) {
+				if (scr->dock->icon_array[i] && scr->dock->icon_array[i]->icon)
+					wIconUpdate(scr->dock->icon_array[i]->icon);
+			}
+		}
+		for (i = 0; i < scr->workspace_count; i++) {
+			if (scr->workspaces[i] && scr->workspaces[i]->clip) {
+				for (int j = 0; j < scr->workspaces[i]->clip->max_icons; j++) {
+					if (scr->workspaces[i]->clip->icon_array[j] && scr->workspaces[i]->clip->icon_array[j]->icon)
+						wIconUpdate(scr->workspaces[i]->clip->icon_array[j]->icon);
+				}
+			}
+		}
+		if (scr->clip_icon && scr->clip_icon->icon)
+			wIconUpdate(scr->clip_icon->icon);
+		for (dc = scr->drawers; dc != NULL; dc = dc->next) {
+			if (dc->adrawer) {
+				for (i = 0; i < dc->adrawer->max_icons; i++) {
+					if (dc->adrawer->icon_array[i] && dc->adrawer->icon_array[i]->icon)
+						wIconUpdate(dc->adrawer->icon_array[i]->icon);
+				}
+			}
+		}
+	}
 }
 
 /* Snap a clip back onto a visible head after a RandR reconfiguration,
