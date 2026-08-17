@@ -15,6 +15,9 @@ cc = meson.get_compiler('c')
 add_project_arguments([
   '-DHAVE_CONFIG_H',
   '-D_GNU_SOURCE',
+  '-fno-strict-aliasing',
+  '-fstack-protector-strong',
+  '-D_FORTIFY_SOURCE=2',
 ], language: 'c')
 
 # Core dependencies
@@ -85,6 +88,23 @@ headers = [
 foreach h : headers
   if cc.has_header(h)
     cdata.set('HAVE_' + h.underscorify().to_upper(), 1)
+  endif
+endforeach
+
+functions = [
+  'mkstemp',
+  'secure_getenv',
+  'mallinfo2',
+  'strlcpy',
+  'strlcat',
+  'setsid',
+  'select',
+  'poll',
+]
+
+foreach f : functions
+  if cc.has_function(f)
+    cdata.set('HAVE_' + f.to_upper(), 1)
   endif
 endforeach
 

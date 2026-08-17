@@ -85,6 +85,44 @@ X11 desktop environments:
   plus streamlined `xinitrc` and display manager session wiring.
 
 
+Building & Installing
+=====================
+
+Method 1: Meson + Ninja (Recommended - Fast & Out-of-tree)
+---------------------------------------------------------
+1. Configure the build:
+     meson setup build --prefix=/usr/local
+
+2. Compile:
+     ninja -C build
+
+3. Install:
+     sudo ninja -C build install
+     sudo ldconfig
+
+4. Clean:
+     rm -rf build
+
+
+Method 2: Autotools (Traditional)
+---------------------------------
+1. Generate configuration:
+     ./autogen.sh
+
+2. Configure:
+     ./configure --prefix=/usr/local --enable-modelock --enable-randr --enable-xinerama
+
+3. Compile:
+     make -j$(nproc)
+
+4. Install:
+     sudo make install
+     sudo ldconfig
+
+5. Clean:
+     make distclean
+
+
 Documentation
 =============
 

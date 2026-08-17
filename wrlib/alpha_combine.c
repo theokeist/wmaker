@@ -29,6 +29,26 @@ void RCombineAlpha(unsigned char *d, unsigned char *s, int s_has_alpha,
     unsigned char *dst = d;
     unsigned char *src = s;
 
+    if (opacity <= 0)
+        return;
+
+    /* Fast path: fully opaque source without alpha channel */
+    if (!s_has_alpha && opacity == 255) {
+        for (y = 0; y < height; y++) {
+            for (x = 0; x < width; x++) {
+                dst[0] = src[0];
+                dst[1] = src[1];
+                dst[2] = src[2];
+                dst[3] = 255;
+                dst += 4;
+                src += 3;
+            }
+            dst += dwi;
+            src += swi;
+        }
+        return;
+    }
+
     for (y = 0; y < height; y++) {
         for (x = 0; x < width; x++) {
             int sa = s_has_alpha ? src[3] : 255;
@@ -39,26 +59,31 @@ void RCombineAlpha(unsigned char *d, unsigned char *s, int s_has_alpha,
                 sa = ((t >> 8) + t) >> 8;
             }
 
-            t = dst[3] * (255 - sa) + 0x80;
-            alpha = sa + (((t >> 8) + t) >> 8);
-
-            if (alpha == 0) {
-                dst[3] = 0;
-            } else if (sa == alpha) {
+            if (sa == 255) {
                 dst[0] = src[0];
                 dst[1] = src[1];
                 dst[2] = src[2];
-                dst[3] = alpha;
-            } else if (sa == 0) {
-                dst[3] = alpha;
-            } else {
-                int ratio = (sa << 8) / alpha;
-                int inv_ratio = 256 - ratio;
+                dst[3] = 255;
+            } else if (sa > 0) {
+                t = dst[3] * (255 - sa) + 0x80;
+                alpha = sa + (((t >> 8) + t) >> 8);
 
-                dst[0] = (dst[0] * inv_ratio + src[0] * ratio) >> 8;
-                dst[1] = (dst[1] * inv_ratio + src[1] * ratio) >> 8;
-                dst[2] = (dst[2] * inv_ratio + src[2] * ratio) >> 8;
-                dst[3] = alpha;
+                if (alpha == 0) {
+                    dst[3] = 0;
+                } else if (sa == alpha) {
+                    dst[0] = src[0];
+                    dst[1] = src[1];
+                    dst[2] = src[2];
+                    dst[3] = alpha;
+                } else {
+                    int ratio = (sa << 8) / alpha;
+                    int inv_ratio = 256 - ratio;
+
+                    dst[0] = (dst[0] * inv_ratio + src[0] * ratio) >> 8;
+                    dst[1] = (dst[1] * inv_ratio + src[1] * ratio) >> 8;
+                    dst[2] = (dst[2] * inv_ratio + src[2] * ratio) >> 8;
+                    dst[3] = alpha;
+                }
             }
 
             dst += 4;

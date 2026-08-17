@@ -129,19 +129,19 @@ Comprehensive roadmap and design notes ([`doc/GLASS_AND_MODERN_UI_NOTES.md`](doc
 #### Debian / Ubuntu / Devuan / Linux Mint
 ```bash
 sudo apt update
-sudo apt install build-essential autoconf automake libtool pkg-config \
+sudo apt install build-essential meson ninja-build pkg-config \
     libx11-dev libxext-dev libxft-dev libxinerama-dev libxrandr-dev \
     libxmu-dev libxpm-dev libpng-dev libjpeg-dev libtiff-dev libgif-dev \
     libwebp-dev libjxl-dev libfontconfig1-dev libfreetype6-dev \
-    libxres-dev libxkbfile-dev compton
+    libcairo2-dev libxres-dev libxkbfile-dev libarchive-dev picom
 ```
 *(Detailed guide: [`doc/BUILDING_ON_DEBIAN_UBUNTU.md`](doc/BUILDING_ON_DEBIAN_UBUNTU.md))*
 
 #### Arch Linux / CachyOS / Manjaro
 ```bash
-sudo pacman -S base-devel libx11 libxext libxft libxinerama libxrandr \
+sudo pacman -S base-devel meson ninja libx11 libxext libxft libxinerama libxrandr \
     libxmu libxpm libpng libjpeg-turbo libtiff giflib libwebp libjxl \
-    fontconfig freetype2 libxres libxkbfile picom
+    fontconfig freetype2 cairo libxres libxkbfile libarchive picom
 ```
 
 #### PCLinuxOS / ALT Linux / Fedora / openSUSE
@@ -151,15 +151,34 @@ sudo pacman -S base-devel libx11 libxext libxft libxinerama libxrandr \
 
 ### 2. Build & Install
 
+#### Option A: Meson + Ninja (Recommended — Ultra-Fast & Out-of-Tree)
+
 ```bash
 # Clone repository
 git clone git@github.com:theokeist/wmaker.git
 cd wmaker
 
-# Generate build configuration
+# Configure build in dedicated directory
+meson setup build --prefix=/usr/local
+
+# Compile using Ninja across all CPU cores
+ninja -C build
+
+# Install binaries, manual pages, and assets
+sudo ninja -C build install
+sudo ldconfig
+
+# Clean build artifacts when needed
+rm -rf build
+```
+
+#### Option B: Autotools (Traditional)
+
+```bash
+# Generate configuration
 ./autogen.sh
 
-# Configure with modern features enabled
+# Configure features
 ./configure \
     --prefix=/usr/local \
     --enable-modelock \
@@ -168,12 +187,15 @@ cd wmaker
     --enable-jxl \
     --enable-webp
 
-# Compile using all available CPU cores
+# Compile in parallel
 make -j$(nproc)
 
-# Install binaries, manual pages, and icons
+# Install
 sudo make install
 sudo ldconfig
+
+# Clean in-tree build artifacts
+make distclean
 ```
 
 ---

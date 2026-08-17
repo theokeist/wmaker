@@ -114,7 +114,9 @@
  */
 
 /* list of paths to look for the config files, searched in order of appearance */
+#ifndef DEF_CONFIG_PATHS
 #define DEF_CONFIG_PATHS "~/GNUstep/Library/WindowMaker:"PKGDATADIR
+#endif
 #define DEF_MENU_FILE	 "menu"
 
 /* name of the script to execute at startup */
