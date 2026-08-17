@@ -893,9 +893,9 @@ AC_SUBST(HEADER_SEARCH_PATH)
 m4_divert_push([INIT_PREPARE])dnl
 AC_ARG_WITH([compositor],
     [AS_HELP_STRING([--with-compositor=NAME],
-        [select default compositor integration (picom|compton|xcompmgr|compiz|none) @<:@none@:>@])],
+        [select default compositor integration (picom|compton|xcompmgr|compiz|none) @<:@picom@:>@])],
     [with_compositor="$withval"],
-    [with_compositor=none])
+    [with_compositor=picom])
 m4_divert_pop([INIT_PREPARE])dnl
 
 AS_CASE([$with_compositor],

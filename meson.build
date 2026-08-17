@@ -66,6 +66,8 @@ cdata.set_quoted('PIXMAPDIR', '/usr/share/pixmaps')
 cdata.set_quoted('GSUSER_SUBDIR', 'GNUstep')
 cdata.set_quoted('USERDATA_SUBDIR', 'Library/WindowMaker')
 cdata.set_quoted('DEFAULTS_SUBDIR', 'Defaults')
+cdata.set_quoted('DEFAULT_COMPOSITOR_NAME', 'Picom')
+cdata.set_quoted('DEFAULT_COMPOSITOR_CONFIG_PATH', '~/.config/picom/picom.conf')
 cdata.set('WM_PI', '(3.14159265358979323846)')
 
 # Header & Feature checks
