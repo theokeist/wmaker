@@ -15,8 +15,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -105,6 +104,16 @@ static void tileObserver(void *self, WMNotification *notif)
 
 static int getSize(Drawable d, unsigned int *w, unsigned int *h, unsigned int *dep)
 {
+	if (d == None) {
+		if (w)
+			*w = 0;
+		if (h)
+			*h = 0;
+		if (dep)
+			*dep = 0;
+		return 0;
+	}
+
 	Window rjunk;
 	int xjunk, yjunk;
 	unsigned int bjunk;
@@ -195,6 +204,7 @@ static WIcon *icon_create_core(WScreen *scr, int coord_x, int coord_y)
 	/* Icon image */
 	icon->file = NULL;
 	icon->file_image = NULL;
+	icon->icon_win = None;
 
 	return icon;
 }
@@ -331,6 +341,14 @@ void wIconChangeTitle(WIcon *icon, WWindow *wwin)
 	/* Set the new one, using two methods to identify
 	the icon name or switch back to window name */
 	icon->icon_name = wNETWMGetIconName(wwin->client_win);
+	if (icon->icon_name) {
+		/* treat empty string as unset */
+		if (icon->icon_name[0] == '\0') {
+			XFree(icon->icon_name);
+			icon->icon_name = NULL;
+		}
+	}
+
 	if (!icon->icon_name)
 		if (!wGetIconName(dpy, wwin->client_win, &icon->icon_name))
 			icon->icon_name = wNETWMGetWindowName(wwin->client_win);
@@ -751,7 +769,10 @@ static void set_dockapp_in_icon(WIcon *icon)
 
 	/* We need the application size to center it
 	 * and show in the correct position */
-	getSize(icon->icon_win, &w, &h, &d);
+	if (!getSize(icon->icon_win, &w, &h, &d)) {
+		wwarning("Drawable invalid, skip reparenting dock app to icon.");
+		return;
+	}
 
 	/* Set the background pixmap */
 	XSetWindowBackgroundPixmap(dpy, icon->core->window, scr->icon_tile_pixmap);
@@ -787,6 +808,9 @@ RImage *get_rimage_icon_from_wm_hints(WIcon *icon)
 		return NULL;
 
 	wwin = icon->owner;
+
+	if (!wwin->wm_hints)
+		return NULL;
 
 	if (!getSize(wwin->wm_hints->icon_pixmap, &w, &h, &d)) {
 		icon->owner->wm_hints->flags &= ~IconPixmapHint;

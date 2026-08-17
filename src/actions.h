@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef WMACTIONS_H_
@@ -41,6 +40,7 @@
 #define SAVE_GEOMETRY_ALL      SAVE_GEOMETRY_X | SAVE_GEOMETRY_Y | SAVE_GEOMETRY_WIDTH | SAVE_GEOMETRY_HEIGHT
 
 void wSetFocusTo(WScreen *scr, WWindow *wwin);
+void wSetFocusToDirection(WScreen *scr, int direction);
 
 int wMouseMoveWindow(WWindow *wwin, XEvent *ev);
 int wKeyboardMoveResizeWindow(WWindow *wwin);

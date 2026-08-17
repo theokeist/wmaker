@@ -15,8 +15,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -32,11 +31,9 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
-#ifdef KEEP_XKB_LOCK_STATUS
 #include <X11/XKBlib.h>
-#endif				/* KEEP_XKB_LOCK_STATUS */
 #ifdef USE_RANDR
-#include <X11/extensions/Xrandr.h>
+#include "randr.h"
 #endif
 
 #include <wraster.h>
@@ -644,6 +641,10 @@ WScreen *wScreenInit(int screen_number)
 		scr->usableArea[i].y2 = scr->totalUsableArea[i].y2 = rect.pos.y + rect.size.height;
 	}
 
+#ifdef USE_RANDR
+	wRandRInit(scr);
+#endif
+
 	scr->fakeGroupLeaders = WMCreateArray(16);
 
 	CantManageScreen = 0;
@@ -660,17 +661,21 @@ WScreen *wScreenInit(int screen_number)
 	XSelectInput(dpy, scr->root_win, event_mask);
 
 #ifdef KEEP_XKB_LOCK_STATUS
-	/* Only GroupLock doesn't work correctly in my system since right-alt
-	 * can change mode while holding it too - ]d
-	 */
-	if (w_global.xext.xkb.supported) {
-		XkbSelectEvents(dpy, XkbUseCoreKbd, XkbStateNotifyMask, XkbStateNotifyMask);
-	}
+	if (w_global.xext.xkb.supported)
+		XkbSelectEvents(dpy, XkbUseCoreKbd,
+						XkbIndicatorStateNotifyMask | XkbStateNotifyMask | XkbNewKeyboardNotifyMask,
+						XkbIndicatorStateNotifyMask | XkbStateNotifyMask | XkbNewKeyboardNotifyMask);
+#else
+	if (w_global.xext.xkb.supported)
+		XkbSelectEvents(dpy, XkbUseCoreKbd, XkbNewKeyboardNotifyMask, XkbNewKeyboardNotifyMask);
 #endif				/* KEEP_XKB_LOCK_STATUS */
 
 #ifdef USE_RANDR
 	if (w_global.xext.randr.supported)
-		XRRSelectInput(dpy, scr->root_win, RRScreenChangeNotifyMask);
+		XRRSelectInput(dpy, scr->root_win,
+		               RRScreenChangeNotifyMask |
+		               RRCrtcChangeNotifyMask   |
+		               RROutputChangeNotifyMask);
 #endif
 
 	XSync(dpy, False);
@@ -1138,6 +1143,7 @@ static XImage *imageCaptureArea(WScreen *scr)
 			GrabModeAsync, None, wPreferences.cursor[WCUR_CAPTURE], CurrentTime) != Success) {
 		return NULL;
 	}
+	XGrabKeyboard(dpy, scr->root_win, False, GrabModeAsync, GrabModeAsync, CurrentTime);
 
 	XGrabServer(dpy);
 
@@ -1157,12 +1163,17 @@ static XImage *imageCaptureArea(WScreen *scr)
 				if (w > 0 && h > 0) {
 					XDrawRectangle(dpy, scr->root_win, scr->frame_gc, x, y, w, h);
 					XUngrabServer(dpy);
+					XUngrabKeyboard(dpy, CurrentTime);
 					XUngrabPointer(dpy, CurrentTime);
 					return XGetImage(dpy, scr->root_win, x, y, w, h, AllPlanes, ZPixmap);
 				}
 			}
 			break;
 		case MotionNotify:
+			/* drop stale root MotionNotify still queued from before
+			 * the grab, otherwise the rectangle anchors at (-1,-1) */
+			if (xp < 0)
+				break;
 			XDrawRectangle(dpy, scr->root_win, scr->frame_gc, x, y, w, h);
 			x = event.xmotion.x_root;
                         if (x < xp) {
@@ -1181,8 +1192,11 @@ static XImage *imageCaptureArea(WScreen *scr)
 			XDrawRectangle(dpy, scr->root_win, scr->frame_gc, x, y, w, h);
 			break;
 		case KeyPress:
-			if (W_KeycodeToKeysym(dpy, event.xkey.keycode, 0) == XK_Escape)
+			if (W_KeycodeToKeysym(dpy, event.xkey.keycode, 0) == XK_Escape) {
+				if (w > 0 && h > 0)
+					XDrawRectangle(dpy, scr->root_win, scr->frame_gc, x, y, w, h);
 				quit = 1;
+			}
 			break;
 		default:
 			WMHandleEvent(&event);
@@ -1191,6 +1205,7 @@ static XImage *imageCaptureArea(WScreen *scr)
 	}
 
 	XUngrabServer(dpy);
+	XUngrabKeyboard(dpy, CurrentTime);
 	XUngrabPointer(dpy, CurrentTime);
 	return NULL;
 }
@@ -1272,7 +1287,14 @@ void ScreenCapture(WScreen *scr, int mode)
 
 	s = time(NULL);
 	tm_info = localtime(&s);
-	strftime(filename_date_part, sizeof(filename_date_part), "screenshot_%Y-%m-%d_at_%H:%M:%S", tm_info);
+	strftime(filename_date_part, sizeof(filename_date_part), wPreferences.screenshot_filename_template, tm_info);
+
+	if (strchr(filename_date_part, '/') != NULL) {
+		wfree(screenshot_dir);
+		werror(_("Unsafe screenshot filename template, it should not contain a path separator"));
+		return;
+	}
+
 	strcpy(filename, filename_date_part);
 
 	filepath = wstrconcat(screenshot_dir, strcat(filename, filetype));
@@ -1361,4 +1383,14 @@ void ScreenCapture(WScreen *scr, int mode)
 	}
 	wfree(filepath);
 	wfree(screenshot_dir);
+}
+
+void wScreenDestroy(WScreen *scr)
+{
+#ifdef USE_RANDR
+	wRandRTeardown(scr);
+#else
+	/* Parameter not used, but tell the compiler that it is ok */
+	(void) scr;
+#endif
 }

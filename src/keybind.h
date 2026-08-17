@@ -2,7 +2,7 @@
  *  Window Maker window manager
  *
  *  Copyright (c) 1997-2003 Alfredo K. Kojima
- *  Copyright (c) 2014-2023 Window Maker Team
+ *  Copyright (c) 2014-2026 Window Maker Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -15,12 +15,13 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef WMKEYBIND_H
 #define WMKEYBIND_H
+
+#define MAX_SHORTCUT_LENGTH 64
 
 /* <X11/X.h> doesn't define these, even though XFree supports them */
 #ifndef Button6
@@ -44,6 +45,7 @@ enum {
 	WKBD_ROOTMENU,
 	WKBD_WINDOWMENU,
 	WKBD_WINDOWLIST,
+	WKBD_KEYCHAIN_CANCEL,
 
 	/* window */
 	WKBD_MINIATURIZE,
@@ -74,9 +76,18 @@ enum {
 	WKBD_WORKSPACEMAP,
 	WKBD_FOCUSNEXT,
 	WKBD_FOCUSPREV,
+	WKBD_FOCUSLEFT,
+	WKBD_FOCUSRIGHT,
+	WKBD_FOCUSUP,
+	WKBD_FOCUSDOWN,
 	WKBD_GROUPNEXT,
 	WKBD_GROUPPREV,
 	WKBD_CENTRAL,
+	WKBD_MARK_SET,
+	WKBD_MARK_UNSET,
+	WKBD_MARK_BRING,
+	WKBD_MARK_JUMP,
+	WKBD_MARK_SWAP,
 
 	/* window, menu */
 	WKBD_CLOSE,
@@ -166,8 +177,13 @@ enum {
 };
 
 typedef struct WShortKey {
-    unsigned int modifier;
-    KeyCode keycode;
+    unsigned int modifier;   /* leader (or only) key modifier - always valid */
+    KeyCode keycode;    /* leader (or only) key code - always valid */
+
+	/* Key-chain support */
+    int chain_length;
+    unsigned int *chain_modifiers;   /* heap-allocated, NULL for single keys */
+    KeyCode *chain_keycodes;    /* heap-allocated, NULL for single keys */
 } WShortKey;
 
 /* ---[ Global Variables ]------------------------------------------------ */
@@ -177,5 +193,6 @@ extern WShortKey wKeyBindings[WKBD_LAST];
 /* ---[ Functions ]------------------------------------------------------- */
 
 void wKeyboardInitialize(void);
+void wShortKeyFree(WShortKey *key);
 
 #endif /* WMKEYBIND_H */

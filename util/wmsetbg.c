@@ -17,8 +17,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 /*
@@ -811,38 +810,67 @@ static int dummyErrorHandler(Display * dpy, XErrorEvent * err)
 	return 0;
 }
 
-static void setPixmapProperty(Pixmap pixmap)
+static Bool getRootPixmapAtom(Atom prop, Pixmap *ret)
 {
-	static Atom prop = 0;
 	Atom type;
 	int format;
 	unsigned long length, after;
-	unsigned char *data;
-	int mode;
+	unsigned char *data = NULL;
+
+	*ret = None;
+	if (XGetWindowProperty(dpy, root, prop, 0L, 1L, False, AnyPropertyType,
+			       &type, &format, &length, &after, &data) != Success)
+		return False;
+	if (type == XA_PIXMAP && format == 32 && length == 1 && data) {
+		*ret = *(Pixmap *)data;
+		XFree(data);
+		return True;
+	}
+	if (data)
+		XFree(data);
+	return False;
+}
+
+static void setPixmapProperty(Pixmap pixmap)
+{
+	static Atom prop = 0;
+	static Atom eprop = 0;
+	Pixmap old_root, old_eset;
+	Bool have_root, have_eset;
 
 	if (!prop) {
 		prop = XInternAtom(dpy, "_XROOTPMAP_ID", False);
+		eprop = XInternAtom(dpy, "ESETROOT_PMAP_ID", False);
 	}
 
 	XGrabServer(dpy);
 
-	/* Clear out the old pixmap */
-	XGetWindowProperty(dpy, root, prop, 0L, 1L, False, AnyPropertyType,
-			   &type, &format, &length, &after, &data);
-
-	if ((type == XA_PIXMAP) && (format == 32) && (length == 1)) {
+	/* Free the previous background pixmap only when both _XROOTPMAP_ID
+	 * and ESETROOT_PMAP_ID hold the same XID, that pairing marks a
+	 * RetainPermanent zombie left by a compliant root setter so
+	 * XKillClient on it cannot hit a live connection.  A bare
+	 * _XROOTPMAP_ID may come from a tool that closed in Destroy mode,
+	 * in which case the client bits of the stored XID can already be
+	 * recycled to a live client, including our own dpy, and killing
+	 * it produces "X connection broken". */
+	have_root = getRootPixmapAtom(prop, &old_root);
+	have_eset = getRootPixmapAtom(eprop, &old_eset);
+	if (have_root && have_eset && old_root == old_eset && old_eset != None) {
 		XSetErrorHandler(dummyErrorHandler);
-		XKillClient(dpy, *((Pixmap *) data));
+		XKillClient(dpy, old_eset);
 		XSync(dpy, False);
 		XSetErrorHandler(NULL);
-		mode = PropModeReplace;
-	} else {
-		mode = PropModeAppend;
 	}
-	if (pixmap)
-		XChangeProperty(dpy, root, prop, XA_PIXMAP, 32, mode, (unsigned char *)&pixmap, 1);
-	else
+
+	if (pixmap) {
+		XChangeProperty(dpy, root, prop, XA_PIXMAP, 32, PropModeReplace,
+				(unsigned char *)&pixmap, 1);
+		XChangeProperty(dpy, root, eprop, XA_PIXMAP, 32, PropModeReplace,
+				(unsigned char *)&pixmap, 1);
+	} else {
 		XDeleteProperty(dpy, root, prop);
+		XDeleteProperty(dpy, root, eprop);
+	}
 
 	XUngrabServer(dpy);
 	XFlush(dpy);

@@ -4,8 +4,7 @@
  *
  *  Copyright (c) 1997-2003 Alfredo K. Kojima
  *  Copyright (c) 1998-2003 Dan Pascu
- *  Copyright (c) 2014-2023 Window Maker Team
-
+ *  Copyright (c) 2014-2026 Window Maker Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -18,8 +17,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -64,8 +62,7 @@
 #include "properties.h"
 #include "misc.h"
 #include "winmenu.h"
-
-#define MAX_SHORTCUT_LENGTH 32
+#include "rootmenu.h"
 
 typedef struct _WDefaultEntry  WDefaultEntry;
 typedef int (WDECallbackConvert) (WScreen *scr, WDefaultEntry *entry, WMPropList *plvalue, void *addr, void **tdata);
@@ -92,6 +89,7 @@ typedef struct {
 /* type converters */
 static WDECallbackConvert getBool;
 static WDECallbackConvert getInt;
+static WDECallbackConvert getString;
 static WDECallbackConvert getCoord;
 static WDECallbackConvert getPathList;
 static WDECallbackConvert getEnum;
@@ -152,6 +150,7 @@ static WDECallbackUpdate setSwPOptions;
 static WDECallbackUpdate updateUsableArea;
 
 static WDECallbackUpdate setModifierKeyLabels;
+static WDECallbackUpdate setModifierShortKeyLabels;
 static WDECallbackUpdate setHotCornerActions;
 
 static WDECallbackConvert getCursor;
@@ -561,6 +560,10 @@ WDefaultEntry optionList[] = {
 	{"KeepDockOnPrimaryHead", "NO", NULL,
 	    &wPreferences.keep_dock_on_primary_head, getBool, updateDock,
 	    NULL, NULL},
+#ifdef USE_RANDR
+	{"HotplugMonitor", "NO", NULL,
+	    &wPreferences.hotplug_monitor, getBool, NULL, NULL, NULL},
+#endif
 	{"HotCorners", "NO", NULL,
 	    &wPreferences.hot_corners, getBool, NULL, NULL, NULL},
 	{"HotCornerDelay", "250", (void *)&wPreferences.hot_corner_delay,
@@ -569,6 +572,14 @@ WDefaultEntry optionList[] = {
 	    &wPreferences.hot_corner_edge, getInt, NULL, NULL, NULL},
 	{"HotCornerActions", "(\"None\", \"None\", \"None\", \"None\")", &wPreferences,
 	    NULL, getPropList, setHotCornerActions, NULL, NULL},
+	{"WindowListAppIcons", "NO", NULL,
+		&wPreferences.window_list_app_icons, getBool, NULL, NULL, NULL},
+	{"MouseWheelFocus", "NO", NULL,
+		&wPreferences.mouse_wheel_focus, getBool, NULL, NULL, NULL},
+	{"KeychainTimeoutDelay", "500", NULL,
+	    &wPreferences.keychain_timeout_delay, getInt, NULL, NULL, NULL},
+	{"ScreenshotFilenameTemplate", DEF_SCREENSHOT_FILENAME_TEMPLATE, NULL,
+	    &wPreferences.screenshot_filename_template, getString, NULL, NULL, NULL},
 
 	/* style options */
 
@@ -657,6 +668,8 @@ WDefaultEntry optionList[] = {
 	    NULL, getPropList, setSwPOptions, NULL, NULL},
 	{"ModifierKeyLabels", "(\"Shift+\", \"Control+\", \"Mod1+\", \"Mod2+\", \"Mod3+\", \"Mod4+\", \"Mod5+\")", &wPreferences,
 	    NULL, getPropList, setModifierKeyLabels, NULL, NULL},
+	{"ModifierKeyShortLabels", "(\"Sh+\", \"^\", \"M1+\", \"M2+\", \"M3+\", \"M4+\", \"M5+\", \"M+\", \"A+\")", &wPreferences,
+	    NULL, getPropList, setModifierShortKeyLabels, NULL, NULL},
 	{"FrameBorderWidth", "1", NULL,
 	    NULL, getInt, setFrameBorderWidth, NULL, NULL},
 	{"FrameBorderColor", "black", NULL,
@@ -675,6 +688,8 @@ WDefaultEntry optionList[] = {
 	{"WindowListKey", "F11", (void *)WKBD_WINDOWLIST,
 	    NULL, getKeybind, setKeyGrab, NULL, NULL},
 	{"WindowMenuKey", "Control+Escape", (void *)WKBD_WINDOWMENU,
+	    NULL, getKeybind, setKeyGrab, NULL, NULL},
+	{"KeychainCancelKey", "None", (void *)WKBD_KEYCHAIN_CANCEL,
 	    NULL, getKeybind, setKeyGrab, NULL, NULL},
 	{"DockRaiseLowerKey", "None", (void*)WKBD_DOCKRAISELOWER,
 	    NULL, getKeybind, setKeyGrab, NULL, NULL},
@@ -739,6 +754,15 @@ WDefaultEntry optionList[] = {
 	{"FocusNextKey", "Mod1+Tab", (void *)WKBD_FOCUSNEXT,
 	    NULL, getKeybind, setKeyGrab, NULL, NULL},
 	{"FocusPrevKey", "Mod1+Shift+Tab", (void *)WKBD_FOCUSPREV,
+	    NULL, getKeybind, setKeyGrab, NULL, NULL},
+	/* Directional window focus */
+	{"FocusWindowLeftKey", "None", (void *)WKBD_FOCUSLEFT,
+	    NULL, getKeybind, setKeyGrab, NULL, NULL},
+	{"FocusWindowRightKey", "None", (void *)WKBD_FOCUSRIGHT,
+	    NULL, getKeybind, setKeyGrab, NULL, NULL},
+	{"FocusWindowUpKey", "None", (void *)WKBD_FOCUSUP,
+	    NULL, getKeybind, setKeyGrab, NULL, NULL},
+	{"FocusWindowDownKey", "None", (void *)WKBD_FOCUSDOWN,
 	    NULL, getKeybind, setKeyGrab, NULL, NULL},
 	{"GroupNextKey", "None", (void *)WKBD_GROUPNEXT,
 	    NULL, getKeybind, setKeyGrab, NULL, NULL},
@@ -842,6 +866,17 @@ WDefaultEntry optionList[] = {
 	    NULL, getKeybind, setKeyGrab, NULL, NULL},
 	{"PartialCaptureKey", "None", (void *)WKBD_PRINTP,
 	    NULL, getKeybind, setKeyGrab, NULL, NULL},
+	/* Vim-like Window Marking */
+	{"MarkSetKey", "None", (void *)WKBD_MARK_SET,
+		NULL, getKeybind, setKeyGrab, NULL, NULL},
+	{"MarkUnsetKey", "None", (void *)WKBD_MARK_UNSET,
+		NULL, getKeybind, setKeyGrab, NULL, NULL},
+	{"MarkBringKey", "None", (void *)WKBD_MARK_BRING,
+		NULL, getKeybind, setKeyGrab, NULL, NULL},
+	{"MarkJumpKey", "None", (void *)WKBD_MARK_JUMP,
+		NULL, getKeybind, setKeyGrab, NULL, NULL},
+	{"MarkSwapKey", "None", (void *)WKBD_MARK_SWAP,
+		NULL, getKeybind, setKeyGrab, NULL, NULL},
 
 #ifdef KEEP_XKB_LOCK_STATUS
 	{"ToggleKbdModeKey", "None", (void *)WKBD_TOGGLE,
@@ -1202,6 +1237,13 @@ void wDefaultsCheckDomains(void* arg)
 			wwarning(_("could not load domain %s from user defaults database"), "WMRootMenu");
 		}
 		w_global.domain.root_menu->timestamp = stbuf.st_mtime;
+
+		/* Rebuild the root menu (without mapping) so that shortcuts take effect immediately. */
+		for (i = 0; i < w_global.screen_count; i++) {
+			WScreen *s = wScreenWithNumber(i);
+			if (s)
+				wRootMenuReparse(s);
+		}
 	}
 #ifndef HAVE_INOTIFY
 	if (!arg)
@@ -1271,7 +1313,6 @@ void wReadDefaults(WScreen * scr, WMPropList * new_dict)
 
 				if (entry->update)
 					needs_refresh |= (*entry->update) (scr, entry, tdata, entry->extra_data);
-
 			}
 		}
 	}
@@ -1338,6 +1379,56 @@ void wReadDefaults(WScreen * scr, WMPropList * new_dict)
 	}
 }
 
+void wReadKeybindings(WScreen *scr, WMPropList *dict)
+{
+	WDefaultEntry *entry;
+	unsigned int i;
+	Bool keybindings_changed = False;
+	void *tdata;
+
+	for (i = 0; i < wlengthof(optionList); i++) {
+		entry = &optionList[i];
+		if (entry->convert == getKeybind) {
+			WMPropList *plvalue = NULL;
+			if (dict)
+				plvalue = WMGetFromPLDictionary(dict, entry->plkey);
+			if (!plvalue)
+				plvalue = entry->plvalue;
+			if (plvalue) {
+				int ok = (*entry->convert)(scr, entry, plvalue, entry->addr, &tdata);
+				if (ok && entry->update) {
+					/* Check whether the (re-)computed binding differs from
+					 * the one already in wKeyBindings[] */
+					long widx = (long)entry->extra_data;
+					WShortKey *nw  = (WShortKey *)tdata;
+					WShortKey *cur = &wKeyBindings[widx];
+					Bool binding_changed =
+					    (cur->modifier    != nw->modifier    ||
+					     cur->keycode     != nw->keycode     ||
+					     cur->chain_length != nw->chain_length);
+
+					if (!binding_changed && nw->chain_length > 1 &&
+						cur->chain_modifiers && cur->chain_keycodes) {
+						int n = nw->chain_length - 1;
+
+						binding_changed =
+						    (memcmp(cur->chain_modifiers, nw->chain_modifiers,
+						            n * sizeof(unsigned int)) != 0 ||
+						     memcmp(cur->chain_keycodes,  nw->chain_keycodes,
+						            n * sizeof(KeyCode)) != 0);
+					}
+					(*entry->update)(scr, entry, tdata, entry->extra_data);
+					if (binding_changed)
+						keybindings_changed = True;
+				}
+			}
+		}
+	}
+
+	if (keybindings_changed)
+		wKeyTreeRebuild(scr);
+}
+
 void wDefaultUpdateIcons(WScreen *scr)
 {
 	WAppIcon *aicon = scr->app_icon_list;
@@ -1362,6 +1453,57 @@ void wDefaultUpdateIcons(WScreen *scr)
 			wIconChangeImageFile(wwin->icon, NULL);
 		wwin = wwin->prev;
 	}
+}
+
+/* Rebuild the global key-binding trie from scratch */
+void wKeyTreeRebuild(WScreen *scr)
+{
+	int i;
+
+	/* Parameter not used */
+	(void)scr;
+
+	wKeyTreeDestroy(wKeyTreeRoot);
+	wKeyTreeRoot = NULL;
+
+	/* Insert all wKeyBindings[] entries */
+	for (i = 0; i < WKBD_LAST; i++) {
+		WShortKey *k = &wKeyBindings[i];
+		WKeyAction *act;
+		KeyCode *keys;
+		WKeyNode *leaf;
+		int len, j;
+		unsigned int *mods;
+
+		/* WKBD_KEYCHAIN_CANCEL is only meaningful while inside an active key chain */
+		if (i == WKBD_KEYCHAIN_CANCEL)
+			continue;
+
+		if (k->keycode == 0)
+			continue;
+
+		len  = (k->chain_length > 1) ? k->chain_length : 1;
+		mods = wmalloc(len * sizeof(unsigned int));
+		keys = wmalloc(len * sizeof(KeyCode));
+		mods[0] = k->modifier;
+		keys[0] = k->keycode;
+
+		for (j = 1; j < len; j++) {
+			mods[j] = k->chain_modifiers[j - 1];
+			keys[j] = k->chain_keycodes[j - 1];
+		}
+
+		leaf = wKeyTreeInsert(&wKeyTreeRoot, mods, keys, len);
+		wfree(mods);
+		wfree(keys);
+
+		act = wKeyNodeAddAction(leaf, WKN_WKBD);
+		if (act)
+			act->u.wkbd_idx = i;
+	}
+
+	/* Insert root-menu shortcuts */
+	wRootMenuInsertIntoTree();
 }
 
 /* --------------------------- Local ----------------------- */
@@ -1414,6 +1556,29 @@ static int string2index(WMPropList *key, WMPropList *val, const char *def, WOpti
  * ret - is the address to store a pointer to a temporary buffer. ret
  * 	must not be freed and is used by the set functions
  */
+static int getString(WScreen * scr, WDefaultEntry * entry, WMPropList * value, void *addr, void **ret)
+{
+	const char *val;
+	char **sptr;
+
+	/* Parameter not used, but tell the compiler that it is ok */
+	(void) scr;
+
+	GET_STRING_OR_DEFAULT("String", val);
+
+	if (ret)
+		*ret = (void *)val;
+
+	if (addr) {
+		sptr = (char **)addr;
+		if (*sptr)
+			wfree(*sptr);
+		*sptr = wstrdup(val);
+	}
+
+	return True;
+}
+
 static int getBool(WScreen * scr, WDefaultEntry * entry, WMPropList * value, void *addr, void **ret)
 {
 	static char data;
@@ -2247,13 +2412,51 @@ static int getColor(WScreen * scr, WDefaultEntry * entry, WMPropList * value, vo
 	return True;
 }
 
+static Bool parseOneKey(WDefaultEntry *entry, const char *token,
+                        unsigned int *out_mod, KeyCode *out_code)
+{
+	char tmp[MAX_SHORTCUT_LENGTH];
+	char *b, *k;
+	KeySym ksym;
+
+	wstrlcpy(tmp, token, MAX_SHORTCUT_LENGTH);
+	b = tmp;
+
+	*out_mod = 0;
+	while ((k = strchr(b, '+')) != NULL) {
+		int mod;
+		*k = 0;
+		mod = wXModifierFromKey(b);
+		if (mod < 0) {
+			wwarning(_("%s: invalid key modifier \"%s\""), entry->key, b);
+			return False;
+		}
+		*out_mod |= mod;
+		b = k + 1;
+	}
+
+	ksym = XStringToKeysym(b);
+	if (ksym == NoSymbol) {
+		wwarning(_("%s: invalid kbd shortcut specification \"%s\""), entry->key, token);
+		return False;
+	}
+
+	*out_code = XKeysymToKeycode(dpy, ksym);
+	if (*out_code == 0) {
+		wwarning(_("%s: invalid key in shortcut \"%s\""), entry->key, token);
+		return False;
+	}
+
+	return True;
+}
+
 static int getKeybind(WScreen * scr, WDefaultEntry * entry, WMPropList * value, void *addr, void **ret)
 {
 	static WShortKey shortcut;
-	KeySym ksym;
 	const char *val;
-	char *k;
-	char buf[MAX_SHORTCUT_LENGTH], *b;
+	char buf[MAX_SHORTCUT_LENGTH];
+	char *token, *saveptr;
+	int step;
 
 	/* Parameter not used, but tell the compiler that it is ok */
 	(void) scr;
@@ -2261,9 +2464,11 @@ static int getKeybind(WScreen * scr, WDefaultEntry * entry, WMPropList * value, 
 
 	GET_STRING_OR_DEFAULT("Key spec", val);
 
+	/* Free old chain arrays before overwriting */
+	wShortKeyFree(&shortcut);
+
 	if (!val || strcasecmp(val, "NONE") == 0) {
-		shortcut.keycode = 0;
-		shortcut.modifier = 0;
+		shortcut.chain_length = 1;
 		if (ret)
 			*ret = &shortcut;
 		return True;
@@ -2271,37 +2476,36 @@ static int getKeybind(WScreen * scr, WDefaultEntry * entry, WMPropList * value, 
 
 	wstrlcpy(buf, val, MAX_SHORTCUT_LENGTH);
 
-	b = (char *)buf;
+	/*
+	 * Support both the traditional single-key syntax and the
+	 * key-chain syntax where space-separated tokens represent
+	 * keys that must be pressed in sequence
+	 */
+	step = 0;
+	token = strtok_r(buf, " ", &saveptr);
+	while (token != NULL) {
+		unsigned int mod;
+		KeyCode kcode;
 
-	/* get modifiers */
-	shortcut.modifier = 0;
-	while ((k = strchr(b, '+')) != NULL) {
-		int mod;
-
-		*k = 0;
-		mod = wXModifierFromKey(b);
-		if (mod < 0) {
-			wwarning(_("%s: invalid key modifier \"%s\""), entry->key, b);
+		if (!parseOneKey(entry, token, &mod, &kcode))
 			return False;
+
+		if (step == 0) {
+			shortcut.modifier = mod;
+			shortcut.keycode  = kcode;
+		} else {
+			shortcut.chain_modifiers = wrealloc(shortcut.chain_modifiers,
+			                                    step * sizeof(unsigned int));
+			shortcut.chain_keycodes  = wrealloc(shortcut.chain_keycodes,
+			                                    step * sizeof(KeyCode));
+			shortcut.chain_modifiers[step - 1] = mod;
+			shortcut.chain_keycodes[step - 1]  = kcode;
 		}
-		shortcut.modifier |= mod;
-
-		b = k + 1;
+		step++;
+		token = strtok_r(NULL, " ", &saveptr);
 	}
 
-	/* get key */
-	ksym = XStringToKeysym(b);
-
-	if (ksym == NoSymbol) {
-		wwarning(_("%s:invalid kbd shortcut specification \"%s\""), entry->key, val);
-		return False;
-	}
-
-	shortcut.keycode = XKeysymToKeycode(dpy, ksym);
-	if (shortcut.keycode == 0) {
-		wwarning(_("%s:invalid key in shortcut \"%s\""), entry->key, val);
-		return False;
-	}
+	shortcut.chain_length = (step > 1) ? step : 1;
 
 	if (ret)
 		*ret = &shortcut;
@@ -3304,7 +3508,25 @@ static int setKeyGrab(WScreen * scr, WDefaultEntry * entry, void *tdata, void *e
 	/* Parameter not used, but tell the compiler that it is ok */
 	(void) entry;
 
+	/* Free old chain arrays before overwriting */
+	wShortKeyFree(&wKeyBindings[widx]);
+
+	/* Shallow copy, then deep-copy the heap arrays */
 	wKeyBindings[widx] = *shortcut;
+	if (shortcut->chain_length > 1) {
+		int n = shortcut->chain_length - 1;
+
+		wKeyBindings[widx].chain_modifiers = wmalloc(n * sizeof(unsigned int));
+		wKeyBindings[widx].chain_keycodes  = wmalloc(n * sizeof(KeyCode));
+
+		memcpy(wKeyBindings[widx].chain_modifiers, shortcut->chain_modifiers,
+		       n * sizeof(unsigned int));
+		memcpy(wKeyBindings[widx].chain_keycodes,  shortcut->chain_keycodes,
+		       n * sizeof(KeyCode));
+	} else {
+		wKeyBindings[widx].chain_modifiers = NULL;
+		wKeyBindings[widx].chain_keycodes  = NULL;
+	}
 
 	wwin = scr->focused_window;
 
@@ -3533,6 +3755,42 @@ static int setModifierKeyLabels(WScreen * scr, WDefaultEntry * entry, void *tdat
 		} else {
 			wwarning(_("Invalid argument for option \"%s\" item %d"), entry->key, i);
 			prefs->modifier_labels[i] = NULL;
+		}
+	}
+
+	WMReleasePropList(array);
+
+	return 0;
+}
+
+static int setModifierShortKeyLabels(WScreen * scr, WDefaultEntry * entry, void *tdata, void *foo)
+{
+	WMPropList *array = tdata;
+	int i;
+	struct WPreferences *prefs = foo;
+
+	if (!WMIsPLArray(array) || WMGetPropListItemCount(array) != 9) {
+		wwarning(_("Value for option \"%s\" must be an array of 9 strings"), entry->key);
+		WMReleasePropList(array);
+		return 0;
+	}
+
+	DestroyWindowMenu(scr);
+
+	for (i = 0; i < 9; i++) {
+		if (prefs->modifier_short_labels[i])
+			wfree(prefs->modifier_short_labels[i]);
+
+		if (WMIsPLString(WMGetFromPLArray(array, i))) {
+			prefs->modifier_short_labels[i] = wstrdup(WMGetFromPLString(WMGetFromPLArray(array, i)));
+			if (prefs->modifier_short_labels[i][0] == '\0') {
+				wwarning(_("Invalid argument for option \"%s\" item %d, cannot be empty"), entry->key, i);
+				wfree(prefs->modifier_short_labels[i]);
+				prefs->modifier_short_labels[i] = NULL;
+			}
+		} else {
+			wwarning(_("Invalid argument for option \"%s\" item %d"), entry->key, i);
+			prefs->modifier_short_labels[i] = NULL;
 		}
 	}
 

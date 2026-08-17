@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -197,8 +196,8 @@ void PropSetIconTileHint(WScreen * scr, RImage * image)
 	if (image->format == RRGBAFormat) {
 		memcpy(&tmp[4], image->data, image->width * image->height * 4);
 	} else {
-		char *ptr = (char *)(tmp + 4);
-		char *src = (char *)image->data;
+		unsigned char *ptr = tmp + 4;
+		unsigned char *src = (unsigned char *)image->data;
 
 		for (y = 0; y < image->height; y++) {
 			for (x = 0; x < image->width; x++) {

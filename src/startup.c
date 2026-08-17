@@ -15,8 +15,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -44,9 +43,7 @@
 #ifdef USE_XSHAPE
 #include <X11/extensions/shape.h>
 #endif
-#ifdef KEEP_XKB_LOCK_STATUS
 #include <X11/XKBlib.h>
-#endif
 #ifdef USE_RANDR
 #include <X11/extensions/Xrandr.h>
 #endif
@@ -407,7 +404,9 @@ static char *atomNames[] = {
 
 	"_GTK_APPLICATION_OBJECT_PATH",
 
-	"WM_IGNORE_FOCUS_EVENTS"
+	"WM_IGNORE_FOCUS_EVENTS",
+
+	"_WINDOWMAKER_MARK_KEY"
 };
 
 /*
@@ -437,6 +436,10 @@ void StartUp(Bool defaultScreenOnly)
 	 * Ignore NumLock and ScrollLock too
 	 */
 	w_global.shortcut.modifiers_mask &= ~(_NumLockMask | _ScrollLockMask);
+
+	/* No active key chain at startup */
+	w_global.shortcut.curpos = NULL;
+	w_global.shortcut.chain_timeout_handler = NULL;
 
 	memset(&wKeyBindings, 0, sizeof(wKeyBindings));
 
@@ -483,6 +486,7 @@ void StartUp(Bool defaultScreenOnly)
 	w_global.atom.desktop.gtk_object_path = atom[20];
 
 	w_global.atom.wm.ignore_focus_events = atom[21];
+	w_global.atom.wmaker.mark_key  = atom[22];
 
 #ifdef USE_DOCK_XDND
 	wXDNDInitializeAtoms();
@@ -609,15 +613,34 @@ void StartUp(Bool defaultScreenOnly)
 #endif
 
 #ifdef USE_RANDR
-	w_global.xext.randr.supported = XRRQueryExtension(dpy, &w_global.xext.randr.event_base, &j);
+	{
+		int rr_major = 0, rr_minor = 0;
+		Bool rr_ext = XRRQueryExtension(dpy, &w_global.xext.randr.event_base, &j);
+		Bool rr_ver = rr_ext && XRRQueryVersion(dpy, &rr_major, &rr_minor);
+
+		if (rr_ver && (rr_major > 1 || (rr_major == 1 && rr_minor >= 3))) {
+			w_global.xext.randr.supported = 1;
+		} else {
+			w_global.xext.randr.supported = 0;
+			if (!rr_ext)
+				wwarning(_("RandR extension is not available"));
+			else if (!rr_ver)
+				wwarning(_("RandR version check failed, RandR disabled"));
+			else
+				wwarning(_("RandR version %d.%d found but RandR version >=1.3 required"), rr_major, rr_minor);
+		}
+	}
 #endif
 
-#ifdef KEEP_XKB_LOCK_STATUS
 	w_global.xext.xkb.supported = XkbQueryExtension(dpy, NULL, &w_global.xext.xkb.event_base, NULL, NULL, NULL);
+#ifdef KEEP_XKB_LOCK_STATUS
 	if (wPreferences.modelock && !w_global.xext.xkb.supported) {
 		wwarning(_("XKB is not supported. KbdModeLock is automatically disabled."));
 		wPreferences.modelock = 0;
 	}
+#else
+	if (!w_global.xext.xkb.supported)
+		wwarning(_("XKB is not supported."));
 #endif
 
 	if (defaultScreenOnly)
@@ -712,6 +735,10 @@ void StartUp(Bool defaultScreenOnly)
 			wWorkspaceForceChange(wScreen[j], lastDesktop);
 		else
 			wSessionRestoreLastWorkspace(wScreen[j]);
+	}
+
+	for (j = 0; j < w_global.screen_count; j++) {
+		wKeyTreeRebuild(wScreen[j]);
 	}
 
 	if (w_global.screen_count == 0) {

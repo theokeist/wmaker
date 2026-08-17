@@ -3,7 +3,7 @@
  *  Window Maker window manager
  *
  *  Copyright (c) 1997-2003 Alfredo K. Kojima
- *  Copyright (c) 2014-2023 Window Maker Team
+ *  Copyright (c) 2014-2026 Window Maker Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -46,12 +45,10 @@
 #endif
 
 #ifdef USE_RANDR
-#include <X11/extensions/Xrandr.h>
+#include "randr.h"
 #endif
 
-#ifdef KEEP_XKB_LOCK_STATUS
 #include <X11/XKBlib.h>
-#endif				/* KEEP_XKB_LOCK_STATUS */
 
 #include "WindowMaker.h"
 #include "window.h"
@@ -103,7 +100,9 @@ static void handleKeyPress(XEvent *event);
 static void handleFocusIn(XEvent *event);
 static void handleMotionNotify(XEvent *event);
 static void handleVisibilityNotify(XEvent *event);
+#ifdef HAVE_INOTIFY
 static void handle_inotify_events(void);
+#endif
 static void handle_selection_request(XSelectionRequestEvent *event);
 static void handle_selection_clear(XSelectionClearEvent *event);
 static void wdelete_death_handler(WMagicNumber id);
@@ -271,10 +270,6 @@ void DispatchEvent(XEvent * event)
 		break;
 
 	case ConfigureNotify:
-#ifdef USE_RANDR
-		if (event->xconfigure.window == DefaultRootWindow(dpy))
-			XRRUpdateConfiguration(event);
-#endif
 		break;
 
 	case SelectionRequest:
@@ -357,14 +352,38 @@ static void handle_inotify_events(void)
 
 			wPreferences.flags.noupdates = 1;
 		}
-		if ((pevent->mask & IN_MODIFY) && oneShotFlag == 0) {
-			wwarning(_("Inotify: Reading config files in defaults database."));
-			wDefaultsCheckDomains(NULL);
-			oneShotFlag = 1;
+		/* Only react when a known config file inside the Defaults directory is affected */
+		if (pevent->len > 0) {
+			char *fname = pevent->name;
+			const char *allowed[] = { "WMRootMenu", "WMWindowAttributes",
+						  "WindowMaker", "WMState", "WMGLOBAL", NULL };
+			int i, matched = 0;
+
+			for (i = 0; allowed[i]; i++) {
+				if (strcmp(fname, allowed[i]) == 0) {
+					matched = 1;
+					break;
+				}
+			}
+
+			if (matched) {
+				/* react to events that indicate a file was created/moved/written */
+				if ((pevent->mask & (IN_MODIFY | IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE)) && oneShotFlag == 0) {
+					wwarning(_("Inotify: Reading config files in defaults database."));
+					wDefaultsCheckDomains(NULL);
+					oneShotFlag = 1;
+				}
+			}
 		}
 
 		/* move to next event in the buffer */
 		i += sizeof(struct inotify_event) + pevent->len;
+	}
+
+	for (i = 0; i < w_global.screen_count; i++) {
+		WScreen *scr = wScreenWithNumber(i);
+		if (scr)
+			wKeyTreeRebuild(scr);
 	}
 }
 #endif /* HAVE_INOTIFY */
@@ -569,20 +588,39 @@ static void handleExtensions(XEvent * event)
 		handleShapeNotify(event);
 	}
 #endif
+	if (w_global.xext.xkb.supported && event->type >= w_global.xext.xkb.event_base
+		&& event->type <= w_global.xext.xkb.event_base + 255) {
+		XkbEvent *xkbevent = (XkbEvent *) event;
+		int xkb_type = xkbevent->any.xkb_type;
+
+		if (xkb_type == XkbNewKeyboardNotify) {
+			int j;
+			WScreen *scr;
+
+			for (j = 0; j < w_global.screen_count; j++) {
+				scr = wScreenWithNumber(j);
+				wReadKeybindings(scr, w_global.domain.wmaker->dictionary);
+			}
+		}
 #ifdef KEEP_XKB_LOCK_STATUS
-	if (wPreferences.modelock && (event->type == w_global.xext.xkb.event_base)) {
-		handleXkbIndicatorStateNotify((XkbEvent *) event);
+		else {
+			/* Listen not only for IndicatorStateNotify but also for StateNotify
+			 * which is commonly emitted on group (layout) changes. */
+			if (wPreferences.modelock && (xkb_type == XkbIndicatorStateNotify || xkb_type == XkbStateNotify)) {
+				handleXkbIndicatorStateNotify(xkbevent);
+			}
+		}
+#endif /*KEEP_XKB_LOCK_STATUS */
 	}
-#endif				/*KEEP_XKB_LOCK_STATUS */
 #ifdef USE_RANDR
-	if (w_global.xext.randr.supported && event->type == (w_global.xext.randr.event_base + RRScreenChangeNotify)) {
-		/* From xrandr man page: "Clients must call back into Xlib using
-		 * XRRUpdateConfiguration when screen configuration change notify
-		 * events are generated */
-		XRRUpdateConfiguration(event);
-		WCHANGE_STATE(WSTATE_RESTARTING);
-		Shutdown(WSRestartPreparationMode);
-		Restart(NULL,True);
+	if (w_global.xext.randr.supported &&
+	    (event->type == (w_global.xext.randr.event_base + RRScreenChangeNotify) ||
+	     event->type == (w_global.xext.randr.event_base + RRNotify))) {
+		WScreen *randr_scr;
+
+		randr_scr = wScreenForRootWindow(event->xany.window);
+		if (randr_scr)
+			wRandRHandleNotify(randr_scr, event);
 	}
 #endif
 }
@@ -1275,6 +1313,7 @@ static void handleXkbIndicatorStateNotify(XkbEvent *event)
 	WScreen *scr;
 	XkbStateRec staterec;
 	int i;
+	(void) event;
 
 	for (i = 0; i < w_global.screen_count; i++) {
 		scr = wScreenWithNumber(i);
@@ -1284,6 +1323,8 @@ static void handleXkbIndicatorStateNotify(XkbEvent *event)
 			if (wwin->frame->languagemode != staterec.group) {
 				wwin->frame->last_languagemode = wwin->frame->languagemode;
 				wwin->frame->languagemode = staterec.group;
+				wWindowGetLanguageLabel(wwin->frame->languagemode, wwin->frame->language_label);
+				wFrameWindowUpdateLanguageButton(wwin->frame);
 			}
 #ifdef XKB_BUTTON_HINT
 			if (wwin->frame->titlebar) {
@@ -1388,55 +1429,60 @@ static int CheckFullScreenWindowFocused(WScreen * scr)
 		return 0;
 }
 
-static void handleKeyPress(XEvent * event)
+/* ------------------------------------------------------------------ *
+ * Key-chain timeout support                                          *
+ *                                                                    *
+ * wPreferences.keychain_timeout_delay in milliseconds after a chain  *
+ * leader is pressed, the chain is automatically cancelled so the     *
+ * user is not stuck in a half-entered sequence. Set to 0 to disable. *
+ * ------------------------------------------------------------------ */
+
+/* Cancels the chain on inactivity */
+static void chainTimeoutCallback(void *data)
 {
-	WScreen *scr = wScreenForRootWindow(event->xkey.root);
-	WWindow *wwin = scr->focused_window;
-	short i, widx;
-	int modifiers;
-	int command = -1;
+	(void)data;
+
+	XUngrabKeyboard(dpy, CurrentTime);
+	w_global.shortcut.curpos = NULL;
+	w_global.shortcut.chain_timeout_handler = NULL;
+}
+
+/* Start (or restart) the chain inactivity timer */
+static void wStartChainTimer(void)
+{
+	if (wPreferences.keychain_timeout_delay > 0) {
+		if (w_global.shortcut.chain_timeout_handler)
+			WMDeleteTimerHandler(w_global.shortcut.chain_timeout_handler);
+		w_global.shortcut.chain_timeout_handler =
+			WMAddTimerHandler(wPreferences.keychain_timeout_delay, chainTimeoutCallback, NULL);
+	}
+}
+
+/* Cancel the chain inactivity timer, if armed */
+static void wCancelChainTimer(void)
+{
+	if (w_global.shortcut.chain_timeout_handler) {
+		WMDeleteTimerHandler(w_global.shortcut.chain_timeout_handler);
+		w_global.shortcut.chain_timeout_handler = NULL;
+	}
+}
+
+#define ISMAPPED(w) ((w) && !(w)->flags.miniaturized && ((w)->flags.mapped || (w)->flags.shaded))
+#define ISFOCUSED(w) ((w) && (w)->flags.focused)
+
+static void startMarkCapture(WScreen *scr, Display *dpy, WMarkCaptureMode mode)
+{
+	scr->flags.mark_capture_mode = mode;
+	XGrabKeyboard(dpy, scr->root_win, False, GrabModeAsync, GrabModeAsync, CurrentTime);
+}
+
+static void dispatchWKBDCommand(int command, WScreen *scr, WWindow *wwin, XEvent *event)
+{
+	short widx;
+	int i;
 #ifdef KEEP_XKB_LOCK_STATUS
 	XkbStateRec staterec;
 #endif				/*KEEP_XKB_LOCK_STATUS */
-
-	/* ignore CapsLock */
-	modifiers = event->xkey.state & w_global.shortcut.modifiers_mask;
-
-	for (i = 0; i < WKBD_LAST; i++) {
-		if (wKeyBindings[i].keycode == 0)
-			continue;
-
-		if (wKeyBindings[i].keycode == event->xkey.keycode && (	/*wKeyBindings[i].modifier==0
-									   || */ wKeyBindings[i].modifier ==
-									      modifiers)) {
-			command = i;
-			break;
-		}
-	}
-
-	if (command < 0) {
-
-		if (!wRootMenuPerformShortcut(event)) {
-			static int dontLoop = 0;
-
-			if (dontLoop > 10) {
-				wwarning("problem with key event processing code");
-				return;
-			}
-			dontLoop++;
-			/* if the focused window is an internal window, try redispatching
-			 * the event to the managed window, as it can be a WINGs window */
-			if (wwin && wwin->flags.internal_window && wwin->client_leader != None) {
-				/* client_leader contains the WINGs toplevel */
-				event->xany.window = wwin->client_leader;
-				WMHandleEvent(event);
-			}
-			dontLoop--;
-		}
-		return;
-	}
-#define ISMAPPED(w) ((w) && !(w)->flags.miniaturized && ((w)->flags.mapped || (w)->flags.shaded))
-#define ISFOCUSED(w) ((w) && (w)->flags.focused)
 
 	switch (command) {
 
@@ -1685,6 +1731,22 @@ static void handleKeyPress(XEvent * event)
 		StartWindozeCycle(wwin, event, False, False);
 		break;
 
+	case WKBD_FOCUSLEFT:
+		wSetFocusToDirection(scr, DIRECTION_LEFT);
+		break;
+
+	case WKBD_FOCUSRIGHT:
+		wSetFocusToDirection(scr, DIRECTION_RIGHT);
+		break;
+
+	case WKBD_FOCUSUP:
+		wSetFocusToDirection(scr, DIRECTION_UP);
+		break;
+
+	case WKBD_FOCUSDOWN:
+		wSetFocusToDirection(scr, DIRECTION_DOWN);
+		break;
+
 	case WKBD_GROUPNEXT:
 		StartWindozeCycle(wwin, event, True, True);
 		break;
@@ -1928,12 +1990,274 @@ static void handleKeyPress(XEvent * event)
 				wwin->frame->languagemode = wwin->frame->last_languagemode;
 				wwin->frame->last_languagemode = staterec.group;
 				XkbLockGroup(dpy, XkbUseCoreKbd, wwin->frame->languagemode);
-
+				/* Update the language label text */
+				wWindowGetLanguageLabel(wwin->frame->languagemode, wwin->frame->language_label);
 			}
 		}
 		break;
 #endif	/* KEEP_XKB_LOCK_STATUS */
+
+	case WKBD_MARK_SET:
+		if (ISMAPPED(wwin) && ISFOCUSED(wwin))
+			startMarkCapture(scr, dpy, MARK_CAPTURE_SET);
+		break;
+
+	case WKBD_MARK_UNSET:
+		if (ISMAPPED(wwin) && ISFOCUSED(wwin) && wwin->mark_key_label != NULL)
+			wWindowUnsetMark(wwin);
+		break;
+
+	case WKBD_MARK_BRING:
+		startMarkCapture(scr, dpy, MARK_CAPTURE_BRING);
+		break;
+
+	case WKBD_MARK_JUMP:
+		startMarkCapture(scr, dpy, MARK_CAPTURE_JUMP);
+		break;
+
+	case WKBD_MARK_SWAP:
+		if (ISMAPPED(wwin) && ISFOCUSED(wwin))
+			startMarkCapture(scr, dpy, MARK_CAPTURE_SWAP);
+		break;
 	}
+}
+
+static void handleKeyPress(XEvent * event)
+{
+	WScreen *scr = wScreenForRootWindow(event->xkey.root);
+	WWindow *wwin = scr->focused_window;
+	WKeyNode  *siblings;
+	WKeyNode  *match;
+	WKeyAction *act;
+	int modifiers;
+
+	/* ignore CapsLock */
+	modifiers = event->xkey.state & w_global.shortcut.modifiers_mask;
+
+	/* ----------------------------------------------------------- *
+	* Window mark capture mode                                     *
+	*                                                              *
+	* We grabbed the keyboard so all keypresses come here until    *
+	* we release the grab.                                         *
+	* ------------------------------------------------------------ */
+	if (scr->flags.mark_capture_mode != MARK_CAPTURE_IDLE) {
+		int capture_mode = scr->flags.mark_capture_mode;
+		KeySym cap_ksym;
+		char label[MAX_SHORTCUT_LENGTH];
+
+		/* Skip modifier-only keypresses */
+		cap_ksym = XLookupKeysym(&event->xkey, 0);
+		if (cap_ksym == NoSymbol || IsModifierKey(cap_ksym))
+			return;
+
+		/* Real key received: exit capture mode and release grab */
+		scr->flags.mark_capture_mode = MARK_CAPTURE_IDLE;
+		XUngrabKeyboard(dpy, CurrentTime);
+
+		if (!GetCanonicalShortcutLabel(modifiers, cap_ksym, label, sizeof(label)))
+			wstrlcpy(label, "?", sizeof(label));
+
+		if (capture_mode == MARK_CAPTURE_SET) {
+			WWindow *target = scr->focused_window;
+			Bool conflict = False;
+			int i;
+
+			/* Conflict check against static wmaker bindings */
+			for (i = 0; i < WKBD_LAST; i++) {
+				if (wKeyBindings[i].keycode == event->xkey.keycode && wKeyBindings[i].modifier == modifiers) {
+					wwarning("window mark: '%s' is already a wmaker binding, mark not assigned", label);
+					conflict = True;
+					break;
+				}
+			}
+
+			/* Conflict check against existing marks on other windows */
+			if (!conflict) {
+				WWindow *tw = scr->focused_window;
+				while (tw) {
+					if (tw != target && tw->mark_key_label != NULL && strcmp(tw->mark_key_label, label) == 0) {
+						wwarning("window mark: label '%s' is already used by another window, mark not assigned", label);
+						conflict = True;
+						break;
+					}
+					tw = tw->prev;
+				}
+			}
+
+			if (!conflict && target != NULL)
+				wWindowSetMark(target, label);
+
+		} else {
+			/* Find marked window by label */
+			WWindow *tw = scr->focused_window;
+
+			while (tw) {
+				if (tw->mark_key_label != NULL && strcmp(tw->mark_key_label, label) == 0)
+					break;
+				tw = tw->prev;
+			}
+			if (tw == NULL) {
+				wwarning("window mark: no window labelled '%s'", label);
+			} else if (capture_mode == MARK_CAPTURE_BRING) {
+				if (tw->frame->workspace != scr->current_workspace)
+					wWindowChangeWorkspace(tw, scr->current_workspace);
+				wMakeWindowVisible(tw);
+			} else if (capture_mode == MARK_CAPTURE_JUMP) {
+				wMakeWindowVisible(tw);
+			} else {
+				/* MARK_CAPTURE_SWAP: swap position, size and workspace between focused and tw */
+				WWindow *focused = scr->focused_window;
+				int fx, fy, fw, fh, tx, ty, tw_w, tw_h;
+				int f_ws, t_ws;
+
+				if (focused == NULL || focused == tw)
+					return;
+
+				/* Snapshot both geometries */
+				fx   = focused->frame_x;
+				fy   = focused->frame_y;
+				fw   = focused->client.width;
+				fh   = focused->client.height;
+				f_ws = focused->frame->workspace;
+
+				tx   = tw->frame_x;
+				ty   = tw->frame_y;
+				tw_w = tw->client.width;
+				tw_h = tw->client.height;
+				t_ws = tw->frame->workspace;
+
+				/* Swap workspaces first so configure lands in the right one */
+				if (f_ws != t_ws) {
+					wWindowChangeWorkspace(focused, t_ws);
+					wWindowChangeWorkspace(tw, f_ws);
+				}
+
+				/* Swap positions and sizes */
+				wWindowConfigure(focused, tx, ty, tw_w, tw_h);
+				wWindowConfigure(tw, fx, fy, fw, fh);
+
+				/* Follow origin window: switch view to the workspace it landed in,
+				* then restore focus to it */
+				if (f_ws != t_ws)
+					wWorkspaceChange(scr, t_ws);
+				wSetFocusTo(scr, focused);
+			}
+		}
+		return;
+	}
+
+	/* ------------------------------------------------------------------ *
+	 * Trie-based key-chain matching                                      *
+	 *                                                                    *
+	 * wKeyTreeRoot is a prefix trie covering ALL key bindings            *
+	 * (wKeyBindings and root-menu shortcuts combined).                   *
+	 * curpos tracks the last matched internal node.                      *
+	 * NULL means we are at the root (idle).                              *
+	 * ------------------------------------------------------------------ */
+
+	if (w_global.shortcut.curpos != NULL) {
+		/*  Inside a chain: look for the next key among children */
+		if (event->xkey.keycode == wKeyBindings[WKBD_KEYCHAIN_CANCEL].keycode &&
+			modifiers == wKeyBindings[WKBD_KEYCHAIN_CANCEL].modifier) {
+			wCancelChainTimer();
+			XUngrabKeyboard(dpy, CurrentTime);
+			w_global.shortcut.curpos = NULL;
+			return;
+		}
+
+		siblings = w_global.shortcut.curpos->first_child;
+		match = wKeyTreeFind(siblings, modifiers, event->xkey.keycode);
+
+		if (match != NULL && match->first_child != NULL) {
+			/* Internal node: advance and keep waiting */
+			w_global.shortcut.curpos = match;
+			wStartChainTimer();
+			return;
+		}
+
+		if (match == NULL) {
+			/* Unrecognized key inside chain: exit chain mode */
+			wCancelChainTimer();
+			XUngrabKeyboard(dpy, CurrentTime);
+			w_global.shortcut.curpos = NULL;
+			return;
+		}
+
+		/*
+		 * Sticky-chain mode: when a KeychainCancelKey is configured,
+		 * stay at the parent level after executing a leaf instead of always
+		 * returning to root.
+		 */
+		if (wKeyBindings[WKBD_KEYCHAIN_CANCEL].keycode != 0) {
+			WKeyNode *parent = match->parent;
+			WKeyNode *child;
+			int nchildren = 0;
+
+			for (child = parent->first_child; child != NULL; child = child->next_sibling)
+				nchildren++;
+
+			if (nchildren > 1) {
+				/* Multi-branch parent: stay in chain mode at this level */
+				w_global.shortcut.curpos = parent;
+				wStartChainTimer();
+			} else {
+				/* Single-branch parent: nothing left to wait for, exit chain */
+				wCancelChainTimer();
+				XUngrabKeyboard(dpy, CurrentTime);
+				w_global.shortcut.curpos = NULL;
+			}
+		} else {
+			/* No cancel key configured: always exit chain after a leaf */
+			wCancelChainTimer();
+			XUngrabKeyboard(dpy, CurrentTime);
+			w_global.shortcut.curpos = NULL;
+		}
+	} else {
+		/* Idle: look for a root-level match */
+		match = wKeyTreeFind(wKeyTreeRoot, modifiers, event->xkey.keycode);
+
+		if (match == NULL) {
+			/* Not a known shortcut: try to redispatch it */
+			static int dontLoop = 0;
+
+			if (dontLoop > 10) {
+				wwarning("problem with key event processing code");
+				return;
+			}
+			dontLoop++;
+			if (wwin && wwin->flags.internal_window &&
+				wwin->client_leader != None) {
+				event->xany.window = wwin->client_leader;
+				WMHandleEvent(event);
+			}
+			dontLoop--;
+
+			return;
+		}
+
+		if (match->first_child != NULL) {
+			/* Internal node: enter chain mode */
+			w_global.shortcut.curpos = match;
+			XGrabKeyboard(dpy, scr->root_win, False,
+							GrabModeAsync, GrabModeAsync, CurrentTime);
+			wStartChainTimer();
+
+			return;
+		}
+	}
+
+	/* Execute all leaf actions for this key sequence */
+	for (act = match->actions; act != NULL; act = act->next) {
+		if (act->type == WKN_MENU) {
+			WMenu *menu  = (WMenu *) act->u.menu.menu;
+			WMenuEntry *entry = (WMenuEntry *) act->u.menu.entry;
+
+			(*entry->callback)(menu, entry);
+		} else {
+			dispatchWKBDCommand(act->u.wkbd_idx, scr, wwin, event);
+		}
+	}
+	return;
 }
 
 #define CORNER_NONE 0
@@ -1942,16 +2266,31 @@ static void handleKeyPress(XEvent * event)
 #define CORNER_BOTTOMLEFT 3
 #define CORNER_BOTTOMRIGHT 4
 
-static int get_corner(WMRect rect, WMPoint p)
+static inline int get_corner(WMRect rect, WMPoint p)
 {
-	if (p.x <= (rect.pos.x + wPreferences.hot_corner_edge) && p.y <= (rect.pos.y + wPreferences.hot_corner_edge))
+	const int edge = wPreferences.hot_corner_edge;
+	const int left_edge = rect.pos.x + edge;
+	const int right_edge = rect.pos.x + rect.size.width - edge;
+	const int top_edge = rect.pos.y + edge;
+	const int bottom_edge = rect.pos.y + rect.size.height - edge;
+
+	int in_left = (p.x <= left_edge);
+	int in_right = (p.x >= right_edge);
+	int in_top = (p.y <= top_edge);
+	int in_bottom = (p.y >= bottom_edge);
+
+	if (!(in_left || in_right) || !(in_top || in_bottom))
+		return CORNER_NONE;
+
+	if (in_left && in_top)
 		return CORNER_TOPLEFT;
-	if (p.x >= (rect.pos.x + rect.size.width - wPreferences.hot_corner_edge) && p.y <= (rect.pos.y + wPreferences.hot_corner_edge))
+	if (in_right && in_top)
 		return CORNER_TOPRIGHT;
-	if (p.x <= (rect.pos.x + wPreferences.hot_corner_edge) && p.y >= (rect.pos.y + rect.size.height - wPreferences.hot_corner_edge))
+	if (in_left && in_bottom)
 		return CORNER_BOTTOMLEFT;
-	if (p.x >= (rect.pos.x + rect.size.width - wPreferences.hot_corner_edge) && p.y >= (rect.pos.y + rect.size.height - wPreferences.hot_corner_edge))
+	if (in_right && in_bottom)
 		return CORNER_BOTTOMRIGHT;
+
 	return CORNER_NONE;
 }
 

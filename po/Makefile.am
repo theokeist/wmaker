@@ -7,7 +7,7 @@ CLEANFILES = $(CATALOGS) $(DOMAIN).pot
 # Please keep this sorted in alphabetic order!
 EXTRA_DIST = be.po bg.po bs.po ca.po cs.po da.po de.po el.po es.po et.po \
 	fi.po fr.po fy.po gl.po hr.po hu.po hy.po it.po ja.po ko.po ms.po nl.po \
-	no.po pl.po pt.po ro.po ru.po sk.po sr.po sv.po tr.po uk.po zh_CN.po \
+	no.po pl.po pt.po pt_BR.po ro.po ru.po sk.po sr.po sv.po tr.po uk.po zh_CN.po \
 	zh_TW.po
 
 POTFILES  = \
@@ -27,6 +27,7 @@ POTFILES  = \
 	$(top_srcdir)/src/framewin.c \
 	$(top_srcdir)/src/geomview.c \
 	$(top_srcdir)/src/icon.c \
+	$(top_srcdir)/src/keytree.c \
 	$(top_srcdir)/src/main.c \
 	$(top_srcdir)/src/menu.c \
 	$(top_srcdir)/src/misc.c \
@@ -40,6 +41,7 @@ POTFILES  = \
 	$(top_srcdir)/src/pixmap.c \
 	$(top_srcdir)/src/placement.c \
 	$(top_srcdir)/src/properties.c \
+	$(top_srcdir)/src/randr.c \
 	$(top_srcdir)/src/resources.c \
 	$(top_srcdir)/src/rootmenu.c \
 	$(top_srcdir)/src/screen.c \

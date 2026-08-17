@@ -122,35 +122,6 @@ static WMSelectionProcs selectionHandler = {
 #define TEXT_WIDTH2(tPtr, start, end) (WMWidthOfString((tPtr)->font, \
     &((tPtr)->text[(start)]), (end) - (start)))
 
-static inline int oneUTF8CharBackward(const char *str, int len)
-{
-	const unsigned char *ustr = (const unsigned char *)str;
-	int pos = 0;
-
-	while (len-- > 0 && ustr[--pos] >= 0x80 && ustr[pos] <= 0xbf) ;
-	return pos;
-}
-
-static inline int oneUTF8CharForward(const char *str, int len)
-{
-	const unsigned char *ustr = (const unsigned char *)str;
-	int pos = 0;
-
-	while (len-- > 0 && ustr[++pos] >= 0x80 && ustr[pos] <= 0xbf) ;
-	return pos;
-}
-
-// find the beginning of the UTF8 char pointed by str
-static inline int seekUTF8CharStart(const char *str, int len)
-{
-	const unsigned char *ustr = (const unsigned char *)str;
-	int pos = 0;
-
-	while (len-- > 0 && ustr[pos] >= 0x80 && ustr[pos] <= 0xbf)
-		--pos;
-	return pos;
-}
-
 static void normalizeRange(TextField * tPtr, WMRange * range)
 {
 	if (range->position < 0 && range->count < 0)
@@ -496,11 +467,6 @@ void WMSetTextFieldAlignment(WMTextField * tPtr, WMAlignment alignment)
 	CHECK_CLASS(tPtr, WC_TextField);
 
 	tPtr->flags.alignment = alignment;
-
-	if (alignment != WALeft) {
-		wwarning(_("only left alignment is supported in textfields"));
-		return;
-	}
 
 	if (tPtr->view->flags.realized) {
 		paintTextField(tPtr);
@@ -853,8 +819,8 @@ static void paintTextField(TextField * tPtr)
 				count = tPtr->viewPosition;
 			}
 
-			rx = tPtr->offsetWidth + 1 + WMWidthOfString(tPtr->font, text, count)
-			    - WMWidthOfString(tPtr->font, text, tPtr->viewPosition);
+			rx = tx + WMWidthOfString(tPtr->font, &(text[tPtr->viewPosition]),
+			                          count - tPtr->viewPosition);
 
 			WMDrawImageString(screen, drawbuffer, color, screen->gray,
 					  tPtr->font, rx, ty, &(text[count]), count2);
@@ -1405,7 +1371,25 @@ static void handleTextFieldActionEvents(XEvent * event, void *data)
 									  tPtr->viewPosition);
 			}
 
-			tPtr->cursorPosition = pointToCursorPosition(tPtr, event->xmotion.x);
+			if (tPtr->flags.alignment == WARight) {
+				int textWidth = WMWidthOfString(tPtr->font, tPtr->text, tPtr->textLen);
+				if (textWidth < tPtr->usableWidth) {
+					tPtr->cursorPosition = pointToCursorPosition(tPtr,
+											     event->xmotion.x - tPtr->usableWidth + textWidth);
+				} else {
+					tPtr->cursorPosition = pointToCursorPosition(tPtr, event->xmotion.x);
+				}
+			} else if (tPtr->flags.alignment == WACenter) {
+				int textWidth = WMWidthOfString(tPtr->font, tPtr->text, tPtr->textLen);
+				if (textWidth < tPtr->usableWidth) {
+					tPtr->cursorPosition = pointToCursorPosition(tPtr,
+											     event->xmotion.x - (tPtr->usableWidth - textWidth) / 2);
+				} else {
+					tPtr->cursorPosition = pointToCursorPosition(tPtr, event->xmotion.x);
+				}
+			} else {
+				tPtr->cursorPosition = pointToCursorPosition(tPtr, event->xmotion.x);
+			}
 
 			/* Do not allow text selection in secure textfields */
 			if (tPtr->flags.secure) {
@@ -1438,17 +1422,35 @@ static void handleTextFieldActionEvents(XEvent * event, void *data)
 			if (tPtr->flags.enabled && !tPtr->flags.focused) {
 				WMSetFocusToWidget(tPtr);
 			}
+			if (textWidth < tPtr->usableWidth) {
+				tPtr->cursorPosition = pointToCursorPosition(tPtr,
+										     event->xbutton.x - tPtr->usableWidth
+										     + textWidth);
+			} else
+				tPtr->cursorPosition = pointToCursorPosition(tPtr, event->xbutton.x);
+
 			if (tPtr->flags.focused) {
 				tPtr->selection.position = tPtr->cursorPosition;
 				tPtr->selection.count = 0;
 			}
+			paintTextField(tPtr);
+			break;
+
+		case WACenter:
+			textWidth = WMWidthOfString(tPtr->font, tPtr->text, tPtr->textLen);
+			if (tPtr->flags.enabled && !tPtr->flags.focused) {
+				WMSetFocusToWidget(tPtr);
+			}
 			if (textWidth < tPtr->usableWidth) {
 				tPtr->cursorPosition = pointToCursorPosition(tPtr,
-									     event->xbutton.x - tPtr->usableWidth
-									     + textWidth);
-			} else
+									     event->xbutton.x - (tPtr->usableWidth - textWidth) / 2);
+			} else {
 				tPtr->cursorPosition = pointToCursorPosition(tPtr, event->xbutton.x);
-
+			}
+			if (tPtr->flags.focused) {
+				tPtr->selection.position = tPtr->cursorPosition;
+				tPtr->selection.count = 0;
+			}
 			paintTextField(tPtr);
 			break;
 
@@ -1462,29 +1464,31 @@ static void handleTextFieldActionEvents(XEvent * event, void *data)
 				tPtr->selection.count = 0;
 				paintTextField(tPtr);
 			}
-			if (event->xbutton.button == Button2 && tPtr->flags.enabled) {
-				char *text;
-				int n;
-
-				if (!WMRequestSelection(tPtr->view, XA_PRIMARY, XA_STRING,
-							event->xbutton.time, pasteText, NULL)) {
-					text = XFetchBuffer(tPtr->view->screen->display, &n, 0);
-
-					if (text) {
-						text[n] = 0;
-						WMInsertTextFieldText(tPtr, text, tPtr->cursorPosition);
-						XFree(text);
-						NOTIFY(tPtr, didChange, WMTextDidChangeNotification,
-						       (void *)WMInsertTextEvent);
-					}
-				} else {
-					tPtr->flags.waitingSelection = 1;
-				}
-			}
 			break;
 		default:
 			break;
 		}
+
+		if (event->xbutton.button == Button2 && tPtr->flags.enabled) {
+			char *text;
+			int n;
+
+			if (!WMRequestSelection(tPtr->view, XA_PRIMARY, XA_STRING,
+						event->xbutton.time, pasteText, NULL)) {
+				text = XFetchBuffer(tPtr->view->screen->display, &n, 0);
+
+				if (text) {
+					text[n] = 0;
+					WMInsertTextFieldText(tPtr, text, tPtr->cursorPosition);
+					XFree(text);
+					NOTIFY(tPtr, didChange, WMTextDidChangeNotification,
+							(void *)WMInsertTextEvent);
+				}
+			} else {
+				tPtr->flags.waitingSelection = 1;
+			}
+		}
+
 		break;
 
 	case ButtonRelease:

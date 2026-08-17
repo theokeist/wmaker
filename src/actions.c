@@ -4,7 +4,7 @@
  *
  *  Copyright (c) 1997-2003 Alfredo K. Kojima
  *  Copyright (c) 1998-2003 Dan Pascu
- *  Copyright (c) 2014-2023 Window Maker Team
+ *  Copyright (c) 2014-2026 Window Maker Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -17,8 +17,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -240,6 +239,100 @@ void wSetFocusTo(WScreen *scr, WWindow *wwin)
 
 	XFlush(dpy);
 	old_scr = scr;
+}
+
+/*
+ *----------------------------------------------------------------------
+ * wSetFocusToDirection--
+ *	Moves focus to the nearest window in the given cardinal
+ *	direction (DIRECTION_LEFT, DIRECTION_RIGHT, DIRECTION_UP,
+ *	DIRECTION_DOWN from xinerama.h).
+ *
+ *	Selection algorithm: candidate windows are scored by
+ *	(primary_distance + perpendicular_offset). A large penalty is
+ *	added when the perpendicular offset exceeds the primary distance
+ *	(i.e. the candidate is more than 45 degrees off-axis). The window
+ *	with the lowest score wins. If no candidate exists in the requested
+ *	direction the call is silently ignored.
+ *----------------------------------------------------------------------
+ */
+void wSetFocusToDirection(WScreen *scr, int direction)
+{
+	WWindow *focused = scr->focused_window;
+	WWindow *best = NULL;
+	WWindow *candidate = NULL;
+	int my_cx, my_cy;
+	long best_score = -1;
+
+	if (!focused || !focused->flags.mapped)
+		return;
+
+	/* centre of the focused window */
+	my_cx = focused->frame_x + (int)focused->frame->core->width  / 2;
+	my_cy = focused->frame_y + (int)focused->frame->core->height / 2;
+
+	/* Iterate from most-recently-focused to least-recently-focused */
+	for (candidate = focused->prev; candidate != NULL; candidate = candidate->prev) {
+		int his_cx, his_cy, distance, offset;
+		long score;
+
+		if (!candidate->flags.mapped)
+			continue;
+		if (WFLAGP(candidate, no_focusable))
+			continue;
+		if (!candidate->frame || candidate->frame->workspace != scr->current_workspace)
+			continue;
+
+		/* ignore fully covered windows if cannot raised them */
+		if (!wPreferences.circ_raise && wWindowIsFullyCovered(candidate))
+			continue;
+
+		/* relative centre of candidate */
+		his_cx = (candidate->frame_x - my_cx) + (int)candidate->frame->core->width  / 2;
+		his_cy = (candidate->frame_y - my_cy) + (int)candidate->frame->core->height / 2;
+
+		switch (direction) {
+		case DIRECTION_RIGHT:
+			distance = his_cx;
+			offset = his_cy < 0 ? -his_cy : his_cy;
+			break;
+		case DIRECTION_LEFT:
+			distance = -his_cx;
+			offset = his_cy < 0 ? -his_cy : his_cy;
+			break;
+		case DIRECTION_DOWN:
+			distance = his_cy;
+			offset = his_cx < 0 ? -his_cx : his_cx;
+			break;
+		case DIRECTION_UP:
+			distance = -his_cy;
+			offset = his_cx < 0 ? -his_cx : his_cx;
+			break;
+		default:
+			continue;
+		}
+
+		/* candidate must be strictly in the requested direction */
+		if (distance <= 0)
+			continue;
+
+		score = distance + offset;
+
+		/* heavy penalty for windows more than 45 degrees off-axis */
+		if (offset > distance)
+			score += 1000000L;
+
+		if (best_score < 0 || score < best_score) {
+			best = candidate;
+			best_score = score;
+		}
+	}
+
+	if (best) {
+		if (wPreferences.circ_raise)
+			wRaiseFrame(best->frame->core);
+		wSetFocusTo(scr, best);
+	}
 }
 
 void wShadeWindow(WWindow *wwin)
@@ -1903,6 +1996,9 @@ void wDeiconifyWindow(WWindow *wwin)
 		}
 	}
 
+	/* Relocate to an active head if the stored position is in dead space */
+	wWindowSnapToHead(wwin);
+
 	/* if the window is in another workspace, do it silently */
 	if (!netwm_hidden) {
 #ifdef USE_ANIMATIONS
@@ -2184,6 +2280,9 @@ static void unhideWindow(WIcon *icon, int icon_x, int icon_y, WWindow *wwin, int
 		wWindowChangeWorkspace(wwin, wwin->screen_ptr->current_workspace);
 
 	wwin->flags.hidden = 0;
+
+	/* Relocate to an active head if the stored position is in dead space */
+	wWindowSnapToHead(wwin);
 
 #ifdef USE_ANIMATIONS
 	if (!wwin->screen_ptr->flags.startup && !wPreferences.no_animations && animate) {

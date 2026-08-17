@@ -15,8 +15,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef _WINGS_H_
@@ -1462,6 +1461,10 @@ void WMSetPopUpButtonEnabled(WMPopUpButton *bPtr, Bool flag);
 
 Bool WMGetPopUpButtonEnabled(WMPopUpButton *bPtr);
 
+int WMSelectPopUpButtonPreviousItem(WMPopUpButton *bPtr);
+
+int WMSelectPopUpButtonNextItem(WMPopUpButton *bPtr);
+
 /* ---[ WINGs/wprogressindicator.c ]------------------------------------- */
 
 WMProgressIndicator* WMCreateProgressIndicator(WMWidget *parent);
@@ -1528,6 +1531,8 @@ void WMSetScrollViewContentView(WMScrollView *sPtr, WMView *view);
 void WMSetScrollViewRelief(WMScrollView *sPtr, WMReliefType type);
 
 WMRect WMGetScrollViewVisibleRect(WMScrollView *sPtr);
+
+void WMScrollViewScrollPoint(WMScrollView * sPtr, WMPoint point);
 
 WMScroller* WMGetScrollViewHorizontalScroller(WMScrollView *sPtr);
 

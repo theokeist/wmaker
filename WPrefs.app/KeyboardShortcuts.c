@@ -15,14 +15,15 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "config.h"		/* for HAVE_XCONVERTCASE */
 
 #include "WPrefs.h"
 #include <ctype.h>
+#include <sys/select.h>
+#include <sys/time.h>
 
 #include <X11/keysym.h>
 #include <X11/XKBlib.h>
@@ -101,8 +102,20 @@ static struct keyOption {
 	{ "SelectKey",      N_("Select active window") },
 	{ "FocusNextKey",   N_("Focus next window") },
 	{ "FocusPrevKey",   N_("Focus previous window") },
+	/* Directional window focus */
+	{ "FocusWindowLeftKey",  N_("Focus the window to the left") },
+	{ "FocusWindowRightKey", N_("Focus the window to the right") },
+	{ "FocusWindowUpKey",    N_("Focus the window above") },
+	{ "FocusWindowDownKey",  N_("Focus the window below") },
 	{ "GroupNextKey",   N_("Focus next group window") },
 	{ "GroupPrevKey",   N_("Focus previous group window") },
+
+	/* Vim-like Window Marking */
+	{ "MarkSetKey",   N_("Mark window: set mark") },
+	{ "MarkUnsetKey", N_("Mark window: unset mark") },
+	{ "MarkBringKey", N_("Mark window: bring marked window here") },
+	{ "MarkJumpKey",  N_("Mark window: jump to marked window") },
+	{ "MarkSwapKey",  N_("Mark window: swap with marked window") },
 
 	/* Workspace Related */
 	{ "WorkspaceMapKey",  N_("Open workspace pager") },
@@ -307,14 +320,53 @@ static int NumLockMask(Display *dpy)
 	return mask;
 }
 
+/* Append the modifier prefix and key name to the keybuf */
+static void build_key_combo(unsigned int xkstate, const char *keyname,
+                             unsigned int numlock_mask, char keybuf[64])
+{
+	if (xkstate & ControlMask)
+		strcat(keybuf, "Control+");
+	if (xkstate & ShiftMask)
+		strcat(keybuf, "Shift+");
+	if ((numlock_mask != Mod1Mask) && (xkstate & Mod1Mask))
+		strcat(keybuf, "Mod1+");
+	if ((numlock_mask != Mod2Mask) && (xkstate & Mod2Mask))
+		strcat(keybuf, "Mod2+");
+	if ((numlock_mask != Mod3Mask) && (xkstate & Mod3Mask))
+		strcat(keybuf, "Mod3+");
+	if ((numlock_mask != Mod4Mask) && (xkstate & Mod4Mask))
+		strcat(keybuf, "Mod4+");
+	if ((numlock_mask != Mod5Mask) && (xkstate & Mod5Mask))
+		strcat(keybuf, "Mod5+");
+	wstrlcat(keybuf, keyname, 64);
+}
+
+/*
+ * Interactively capture a key shortcut or keychain,
+ * function waits KeychainTimeoutDelay or 300 ms after
+ * each key press for another key in the chain,
+ * and returns the full key specification string.
+ */
 char *capture_shortcut(Display *dpy, Bool *capturing, Bool convert_case)
 {
 	XEvent ev;
 	KeySym ksym, lksym, uksym;
-	char buffer[64];
-	char *key = NULL;
+	/* Large enough for several chained chords */
+	char buffer[512];
+	char keybuf[64];
+	char *key;
 	unsigned int numlock_mask;
+	Bool have_key = False;
+	Bool chain_mode;
+	int timeout_ms;
 
+	timeout_ms = GetIntegerForKey("KeychainTimeoutDelay");
+	if (timeout_ms <= 0)
+		timeout_ms = 300;
+
+	buffer[0] = '\0';
+
+	/* ---- Phase 1: capture the first key (blocking) ---- */
 	while (*capturing) {
 		XAllowEvents(dpy, AsyncKeyboard, CurrentTime);
 		WMNextEvent(dpy, &ev);
@@ -332,41 +384,62 @@ char *capture_shortcut(Display *dpy, Bool *capturing, Bool convert_case)
 					key = XKeysymToString(ksym);
 				}
 
-				*capturing = 0;
+				keybuf[0] = '\0';
+				build_key_combo(ev.xkey.state, key, numlock_mask, keybuf);
+				wstrlcat(buffer, keybuf, sizeof(buffer));
+				have_key = True;
 				break;
 			}
 		}
 		WMHandleEvent(&ev);
 	}
 
-	if (!key)
+	/* ---- Phase 2: collect additional chain keys with timeout ---- */
+	chain_mode = (timeout_ms > 0);
+	while (*capturing && chain_mode) {
+		int xfd = ConnectionNumber(dpy);
+		fd_set rfds;
+		struct timeval tv;
+
+		if (!XPending(dpy)) {
+			FD_ZERO(&rfds);
+			FD_SET(xfd, &rfds);
+			tv.tv_sec  = timeout_ms / 1000;
+			tv.tv_usec = (timeout_ms % 1000) * 1000;
+			XFlush(dpy);
+			if (select(xfd + 1, &rfds, NULL, NULL, &tv) == 0)
+				break;  /* timeout: the chain is complete */
+		}
+
+		XAllowEvents(dpy, AsyncKeyboard, CurrentTime);
+		WMNextEvent(dpy, &ev);
+		if (ev.type == KeyPress && ev.xkey.keycode != 0) {
+			numlock_mask = NumLockMask(dpy);
+			ksym = W_KeycodeToKeysym(dpy, ev.xkey.keycode,
+			                         ev.xkey.state & numlock_mask ? 1 : 0);
+
+			if (!IsModifierKey(ksym)) {
+				if (convert_case) {
+					XConvertCase(ksym, &lksym, &uksym);
+					key = XKeysymToString(uksym);
+				} else {
+					key = XKeysymToString(ksym);
+				}
+
+				keybuf[0] = '\0';
+				build_key_combo(ev.xkey.state, key, numlock_mask, keybuf);
+				wstrlcat(buffer, " ", sizeof(buffer));
+				wstrlcat(buffer, keybuf, sizeof(buffer));
+			}
+		} else {
+			WMHandleEvent(&ev);
+		}
+	}
+
+	if (!have_key || !*capturing)
 		return NULL;
 
-	buffer[0] = 0;
-
-	if (ev.xkey.state & ControlMask)
-		strcat(buffer, "Control+");
-
-	if (ev.xkey.state & ShiftMask)
-		strcat(buffer, "Shift+");
-
-	if ((numlock_mask != Mod1Mask) && (ev.xkey.state & Mod1Mask))
-		strcat(buffer, "Mod1+");
-
-	if ((numlock_mask != Mod2Mask) && (ev.xkey.state & Mod2Mask))
-		strcat(buffer, "Mod2+");
-
-	if ((numlock_mask != Mod3Mask) && (ev.xkey.state & Mod3Mask))
-		strcat(buffer, "Mod3+");
-
-	if ((numlock_mask != Mod4Mask) && (ev.xkey.state & Mod4Mask))
-		strcat(buffer, "Mod4+");
-
-	if ((numlock_mask != Mod5Mask) && (ev.xkey.state & Mod5Mask))
-		strcat(buffer, "Mod5+");
-
-	wstrlcat(buffer, key, sizeof(buffer));
-
+	*capturing = 0;
 	return wstrdup(buffer);
 }
 
@@ -444,7 +517,7 @@ static void captureClick(WMWidget * w, void *data)
 	}
 	panel->capturing = 0;
 	WMSetButtonText(w, _("Capture"));
-	WMSetLabelText(panel->instructionsL, _("Click on Capture to interactively define the shortcut key."));
+	WMSetLabelText(panel->instructionsL, _("Click on Capture to interactively define the shortcut key(s)."));
 	XUngrabKeyboard(dpy, CurrentTime);
 }
 
@@ -455,6 +528,9 @@ static void clearShortcut(WMWidget * w, void *data)
 
 	/* Parameter not used, but tell the compiler that it is ok */
 	(void) w;
+
+	/* Cancel any ongoing capture so the keychain loop is unblocked */
+	panel->capturing = 0;
 
 	WMSetTextFieldText(panel->shoT, NULL);
 

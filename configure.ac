@@ -78,9 +78,9 @@ WRASTER_VERSION=$WRASTER_CURRENT:$WRASTER_REVISION:$WRASTER_AGE
 AC_SUBST(WRASTER_VERSION)
 dnl
 dnl libWINGs
-WINGS_CURRENT=5
+WINGS_CURRENT=6
 WINGS_REVISION=0
-WINGS_AGE=2
+WINGS_AGE=3
 WINGS_VERSION=$WINGS_CURRENT:$WINGS_REVISION:$WINGS_AGE
 AC_SUBST(WINGS_VERSION)
 dnl
@@ -153,6 +153,20 @@ AS_IF([test "x$debug" = "xyes"],
      CPPFLAGS="$CPPFLAGS -DNDEBUG"
 ])
 
+
+dnl Native CPU Optimizations Option
+dnl =================
+m4_divert_push([INIT_PREPARE])dnl
+AC_ARG_ENABLE([native],
+    [AS_HELP_STRING([--enable-native], [enable native option, @<:@default=no@:>@])],
+    [AS_CASE(["$enableval"],
+        [yes], [native=yes],
+        [no],  [native=no],
+        [AC_MSG_ERROR([bad value $enableval for --enable-native])] )],
+    [native=no])
+m4_divert_pop([INIT_PREPARE])dnl
+AS_IF([test "x$native" = "xyes"],
+    [AX_CFLAGS_GCC_OPTION([-march=native])])
 
 AX_CFLAGS_GCC_OPTION([-Wall])
 AX_CFLAGS_GCC_OPTION([-Wextra -Wno-sign-compare])
@@ -565,7 +579,9 @@ AC_ARG_ENABLE([modelock],
 m4_divert_pop([INIT_PREPARE])dnl
 
 AS_IF([test "x$enable_modelock" = "xyes"],
-    [AC_DEFINE([XKB_MODELOCK], [1], [whether XKB language MODELOCK should be enabled]) ])
+    [WM_XEXT_CHECK_XKBFILE
+     AS_IF([test "x$enable_modelock" = "xyes"],
+         [AC_DEFINE([XKB_MODELOCK], [1], [whether XKB language MODELOCK should be enabled])])])
 
 
 dnl XDND Drag-nd-Drop support
@@ -665,11 +681,11 @@ dnl RandR support
 dnl =============
 m4_divert_push([INIT_PREPARE])dnl
 AC_ARG_ENABLE([randr],
-    [AS_HELP_STRING([--enable-randr], [enable RandR extension support (NOT recommended, buggy)])],
+    [AS_HELP_STRING([--enable-randr], [enable RandR extension support for multi-monitor live reconfiguration])],
     [AS_CASE(["$enableval"],
         [yes|no], [],
         [AC_MSG_ERROR([bad value $enableval for --enable-randr]) ]) ],
-    [enable_randr=no])
+    [enable_randr=auto])
 m4_divert_pop([INIT_PREPARE])dnl
 WM_XEXT_CHECK_XRANDR
 
@@ -1085,6 +1101,9 @@ echo "Supported graphic format libraries  :$supported_gfx"
 echo "Unsupported features                :$unsupported"
 echo "Pango text layout support in WINGs  : $pango"
 echo "Translated languages to support     :$supported_locales"
+AS_IF([test "x$native" = "xyes"],
+    [AS_ECHO(["Target architecture                 : native"]) ],
+    [AS_ECHO(["Target architecture                 : generic"]) ])
 AS_IF([test "x$WEB_REPO_ROOT" != "x"],
     [AS_ECHO(["Git repository for WMaker's Website : $WEB_REPO_ROOT"]) ])
 AS_IF([test "x$debug" = "xyes"],

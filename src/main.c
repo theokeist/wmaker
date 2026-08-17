@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -326,7 +325,8 @@ void ExecuteShellCommand(WScreen *scr, const char *command)
 #endif
 		execl(shell, shell, "-c", command, NULL);
 		werror("could not execute %s -c %s", shell, command);
-		Exit(-1);
+		/* exec failed in child -- exit immediately without running parent cleanup */
+		_exit(127);
 	} else if (pid < 0) {
 		werror("cannot fork a new process");
 	} else {
@@ -377,10 +377,10 @@ Bool RelaunchWindow(WWindow *wwin)
 		setsid();
 #endif
 		/* argv is not null-terminated */
-		char **a = (char **) malloc(argc + 1);
+		char **a = malloc((argc + 1) * sizeof(char *));
 		if (! a) {
 			werror("out of memory trying to relaunch the application");
-			Exit(-1);
+			_exit(127);
 		}
 
 		int i;
@@ -389,7 +389,8 @@ Bool RelaunchWindow(WWindow *wwin)
 		a[i] = NULL;
 
 		execvp(a[0], a);
-		Exit(-1);
+		/* exec failed in child -- exit immediately */
+		_exit(127);
 	} else if (pid < 0) {
 		werror("cannot fork a new process");
 

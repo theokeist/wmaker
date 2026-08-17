@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef WMWINDOW_H_
@@ -237,6 +236,12 @@ typedef struct WWindow {
 	int cmap_window_no;
 	Window *cmap_windows;
 
+	/* move/resize state for _NET_WM_MOVERESIZE support */
+	struct {
+		int active;			/* 1 if move/resize is in progress */
+		int resize_edge;		/* which edge for resize (0-7) */
+	} moveresize;
+
 	/* protocols */
 	WProtocols protocols;			/* accepted WM_PROTOCOLS */
 
@@ -294,6 +299,7 @@ typedef struct WWindow {
 	RImage *net_icon_image;			/* Window Image */
 	RImage *animation_snapshot;	/* Cached content for animations */
 	Atom type;
+	char *mark_key_label;		/* Vim-like Window Marking */
 } WWindow;
 
 #define HAS_TITLEBAR(w)		(!(WFLAGP((w), no_titlebar) || (w)->flags.fullscreen))
@@ -318,6 +324,7 @@ typedef struct WSavedState {
     unsigned int w;
     unsigned int h;
     unsigned window_shortcuts; /* mask like 1<<shortcut_number */
+	char *mark_key;	/* serialised mark key label */
 } WSavedState;
 
 typedef struct WWindowState {
@@ -357,6 +364,7 @@ void wWindowConfigure(WWindow *wwin, int req_x, int req_y,
                       int req_width, int req_height);
 
 void wWindowMove(WWindow *wwin, int req_x, int req_y);
+void wWindowSnapToHead(WWindow *wwin);
 
 void wWindowSynthConfigureNotify(WWindow *wwin);
 
@@ -397,7 +405,17 @@ WMagicNumber wWindowGetSavedState(Window win);
 
 void wWindowDeleteSavedState(WMagicNumber id);
 
+Bool wWindowIsFullyCovered(WWindow *wwin);
 Bool wWindowObscuresWindow(WWindow *wwin, WWindow *obscured);
 
 void wWindowSetOmnipresent(WWindow *wwin, Bool flag);
+
+/* Vim-like window marking management */
+void wWindowSetMark(WWindow *wwin, const char *label);
+void wWindowUnsetMark(WWindow *wwin);
+
+#ifdef XKB_BUTTON_HINT
+void wWindowGetLanguageLabel(int group_index, char *label);
+#endif
+
 #endif

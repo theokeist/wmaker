@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef WMSCREEN_H_
@@ -58,6 +57,14 @@ typedef struct WDrawerChain {
     struct WDock *adrawer;
     struct WDrawerChain *next;
 } WDrawerChain;
+
+typedef enum {
+    MARK_CAPTURE_IDLE  = 0,
+    MARK_CAPTURE_SET   = 1,
+    MARK_CAPTURE_BRING = 2,
+    MARK_CAPTURE_JUMP  = 3,
+    MARK_CAPTURE_SWAP  = 4
+} WMarkCaptureMode;
 
 /*
  * each WScreen is saved into a context associated with its root window
@@ -299,6 +306,11 @@ typedef struct _WScreen {
     /* for hot-corners delay */
     WMHandlerID *hot_corner_timer;
 
+#ifdef USE_RANDR
+    WMHandlerID *randr_debounce_timer;
+    void *randr_state;
+#endif
+
     /* for window shortcuts */
     WMArray *shortcutWindows[MAX_WINDOW_SHORTCUTS];
 
@@ -327,6 +339,8 @@ typedef struct _WScreen {
         unsigned int jump_back_pending:1;
         unsigned int ignore_focus_events:1;
         unsigned int in_hot_corner:3;
+        unsigned int mark_capture_mode:3;  /* one of WMarkCaptureMode */
+
     } flags;
 } WScreen;
 
@@ -345,7 +359,7 @@ WScreen *wScreenWithNumber(int i);
 WScreen *wScreenForRootWindow(Window window);   /* window must be valid */
 WScreen *wScreenForWindow(Window window);   /* slower than above functions */
 
-void wScreenFinish(WScreen *scr);
+void wScreenDestroy(WScreen *scr);
 void wScreenUpdateUsableArea(WScreen *scr);
 
 void create_logo_image(WScreen *scr);

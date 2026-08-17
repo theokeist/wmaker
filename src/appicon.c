@@ -16,8 +16,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -146,6 +145,10 @@ WAppIcon *wAppIconCreateForDock(WScreen *scr, const char *command, const char *w
 
 void create_appicon_for_application(WApplication *wapp, WWindow *wwin)
 {
+	/* Transient windows should never get their own appicon */
+	if (wwin->transient_for != None && wwin->transient_for != wwin->screen_ptr->root_win)
+		return;
+
 	/* Try to create an icon from the dock or clip */
 	create_appicon_from_dock(wwin, wapp, wapp->main_window);
 

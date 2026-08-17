@@ -15,8 +15,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 #ifndef WMMISC_H_
 #define WMMISC_H_
@@ -56,8 +55,11 @@ char *ExpandOptions(WScreen * scr, const char *cmdline);
 void ExecuteInputCommand(WScreen *scr, const char *cmdline);
 void ExecuteExitCommand(WScreen *scr, long quickmode);
 char *GetShortcutString(const char *text);
+Bool GetCanonicalShortcutLabel(unsigned int modifiers, KeySym ksym, char *buf, size_t bufsz);
 char *GetShortcutKey(WShortKey key);
 char *EscapeWM_CLASS(const char *name, const char *class);
 char *StrConcatDot(const char *a, const char *b);
 char *GetCommandForWindow(Window win);
+int WMStrEqual(const char *x, const char *y);
+int WMPLGetBool(WMPropList *value);
 #endif

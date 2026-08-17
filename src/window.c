@@ -16,14 +16,14 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #ifdef USE_XSHAPE
 #include <X11/extensions/shape.h>
 #endif
@@ -38,6 +38,12 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#include <ctype.h>
+
+#ifdef XKB_BUTTON_HINT
+#include <X11/extensions/XKBfile.h>  // Required for XkbRF_VarDefsRec
+#include <X11/extensions/XKBrules.h> // Required for XkbRF_GetNamesProp
+#endif
 
 /* For getting mouse wheel mappings from WINGs */
 #include <WINGs/WINGs.h>
@@ -68,6 +74,7 @@
 #include "startup.h"
 #include "winmenu.h"
 #include "osdep.h"
+#include "switchmenu.h"
 
 #ifdef USE_MWM_HINTS
 # include "motif.h"
@@ -193,6 +200,10 @@ void wWindowDestroy(WWindow *wwin)
 			wwin->screen_ptr->shortcutWindows[i] = NULL;
 		}
 	}
+
+	/* clean up any mark assigned to this window */
+	if (wwin->mark_key_label != NULL)
+		wWindowUnsetMark(wwin);
 
 	if (wwin->fake_group && wwin->fake_group->retainCount > 0) {
 		wwin->fake_group->retainCount--;
@@ -459,6 +470,35 @@ void wWindowSetupInitialAttributes(WWindow *wwin, int *level, int *workspace)
 	/* windows that have takefocus=False shouldn't take focus at all */
 	if (wwin->focus_mode == WFM_NO_INPUT)
 		wwin->client_flags.no_focusable = 1;
+}
+
+/*
+ * Returns True if every pixel of 'wwin' is covered by at least one other
+ * mapped window on the same workspace, making it invisible to the user
+ */
+Bool wWindowIsFullyCovered(WWindow *wwin)
+{
+	WScreen *scr = wwin->screen_ptr;
+	int cx = wwin->frame_x;
+	int cy = wwin->frame_y;
+	int cright  = cx + (int)wwin->frame->core->width;
+	int cbottom = cy + (int)wwin->frame->core->height;
+	WWindow *w;
+
+	for (w = scr->focused_window; w != NULL; w = w->prev) {
+		if (w == wwin)
+			continue;
+		if (!w->flags.mapped)
+			continue;
+		if (!w->frame || w->frame->workspace != scr->current_workspace)
+			continue;
+		if (w->frame_x <= cx &&
+		    w->frame_y <= cy &&
+		    w->frame_x + (int)w->frame->core->width  >= cright &&
+		    w->frame_y + (int)w->frame->core->height >= cbottom)
+			return True;
+	}
+	return False;
 }
 
 Bool wWindowObscuresWindow(WWindow *wwin, WWindow *obscured)
@@ -797,6 +837,15 @@ WWindow *wManageWindow(WScreen *scr, Window window)
 	/* get geometry stuff */
 	wClientGetNormalHints(wwin, &wattribs, True, &x, &y, &width, &height);
 
+	/* Some applications create placeholder windows with 1x1 size
+	 * (e.g. VirtualBox internal windows). Don't manage those initial
+	 * 1x1 windows. */
+	if (width <= 1 && height <= 1 && !wwin->flags.is_dockapp) {
+		wWindowDestroy(wwin);
+		XUngrabServer(dpy);
+		return NULL;
+	}
+
 	/* get colormap windows */
 	GetColormapWindows(wwin);
 
@@ -842,6 +891,12 @@ WWindow *wManageWindow(WScreen *scr, Window window)
 
 		/* // only enter here if PropGetWMClass() succeeds */
 		PropGetWMClass(wwin->main_window, &class, &instance);
+		if (!class || class[0] == '\0') {
+			if (wwin->wm_class && wwin->wm_class[0] != '\0')
+				class = strdup(wwin->wm_class);
+			else
+				class = strdup("default");
+		}
 		buffer = StrConcatDot(instance, class);
 
 		index = WMFindInArray(scr->fakeGroupLeaders, matchIdentifier, (void *)buffer);
@@ -987,8 +1042,17 @@ WWindow *wManageWindow(WScreen *scr, Window window)
 			}
 		}
 
-		if (wstate != NULL)
+		/* restore mark: prefer session state, fall back to warm-restart hint */
+		if (win_state != NULL && win_state->state->mark_key != NULL)
+			wWindowSetMark(wwin, win_state->state->mark_key);
+		else if (wstate != NULL && wstate->mark_key != NULL)
+			wWindowSetMark(wwin, wstate->mark_key);
+
+		if (wstate != NULL) {
+			if (wstate->mark_key != NULL)
+				wfree(wstate->mark_key);
 			wfree(wstate);
+		}
 	}
 
 	/* don't let transients start miniaturized if their owners are not */
@@ -1032,8 +1096,28 @@ WWindow *wManageWindow(WScreen *scr, Window window)
 		Bool dontBring = False;
 
 		if (win_state && win_state->state->w > 0) {
+			WMRect rect;
+			int head, flags;
+
 			x = win_state->state->x;
 			y = win_state->state->y;
+
+			/* If the saved position falls in dead space (for example a monitor that no longer
+			* exists), clamp the window to the nearest active head. */
+			rect.pos.x = x;
+			rect.pos.y = y;
+			rect.size.width = width;
+			rect.size.height = height;
+
+			head = wGetRectPlacementInfo(scr, rect, &flags);
+			if (flags & XFLAG_DEAD) {
+				rect = wGetRectForHead(scr, head);
+
+				x = rect.pos.x + (x * rect.size.width) / scr->scr_width;
+				y = rect.pos.y + (y * rect.size.height) / scr->scr_height;
+
+				wScreenBringInside(scr, &x, &y, width, height);
+			}
 		} else if ((wwin->transient_for == None || wPreferences.window_placement != WPM_MANUAL)
 			   && !scr->flags.startup
 			   && !wwin->flags.miniaturized
@@ -1431,7 +1515,8 @@ WWindow *wManageInternalWindow(WScreen *scr, Window window, Window owner,
 	foo = WFF_RIGHT_BUTTON | WFF_BORDER;
 	foo |= WFF_TITLEBAR;
 #ifdef XKB_BUTTON_HINT
-	foo |= WFF_LANGUAGE_BUTTON;
+	if (wPreferences.modelock)
+		foo |= WFF_LANGUAGE_BUTTON;
 #endif
 
 	wwin->frame = wFrameWindowCreate(scr, WMFloatingLevel,
@@ -2179,6 +2264,14 @@ void wWindowConfigure(WWindow *wwin, int req_x, int req_y, int req_width, int re
 			wFrameWindowConfigure(wwin->frame, req_x, req_y, req_width, h);
 		}
 
+		/*
+		 * When the frame is resized/moved, the X server repositions a client
+		 * with non-NorthWest gravity inside the frame to compensate (visible as
+		 * a GravityNotify with xev), leaving it at the wrong offset.
+		 */
+		if (wwin->normal_hints->win_gravity != NorthWestGravity)
+			XMoveWindow(dpy, wwin->client_win, 0, wwin->frame->top_width);
+
 		if (!(req_height > wwin->frame->core->height || req_width > wwin->frame->core->width))
 			XResizeWindow(dpy, wwin->client_win, req_width, req_height);
 
@@ -2254,6 +2347,26 @@ void wWindowMove(WWindow *wwin, int req_x, int req_y)
 #endif
 }
 
+/* Move the window to the nearest on-screen position if its stored
+ * frame origin falls in dead space (for example when a RandR monitor
+ * was removed while the window was miniaturized or hidden) */
+void wWindowSnapToHead(WWindow *wwin)
+{
+#ifdef USE_RANDR
+	int bw = HAS_BORDER(wwin) ? wwin->screen_ptr->frame_border_width : 0;
+	int rx = wwin->frame_x - bw;
+	int ry = wwin->frame_y - bw;
+
+	if (wScreenBringInside(wwin->screen_ptr, &rx, &ry,
+	                       wwin->frame->core->width  + 2 * bw,
+	                       wwin->frame->core->height + 2 * bw))
+		wWindowMove(wwin, rx + bw, ry + bw);
+#else
+	/* Parameter not used, but tell the compiler that it is ok */
+	(void) wwin;
+#endif
+}
+
 void wWindowUpdateButtonImages(WWindow *wwin)
 {
 	WScreen *scr = wwin->screen_ptr;
@@ -2291,14 +2404,6 @@ void wWindowUpdateButtonImages(WWindow *wwin)
 			fwin->lbutton_image = scr->b_pixmaps[WBUT_ICONIFY];
 		}
 	}
-#ifdef XKB_BUTTON_HINT
-	if (!WFLAGP(wwin, no_language_button)) {
-		if (fwin->languagebutton_image && !fwin->languagebutton_image->shared)
-			wPixmapDestroy(fwin->languagebutton_image);
-
-		fwin->languagebutton_image = scr->b_pixmaps[WBUT_XKBGROUP1 + fwin->languagemode];
-	}
-#endif
 
 	/* close button */
 
@@ -2467,6 +2572,14 @@ void wWindowSaveState(WWindow *wwin)
 
 	XChangeProperty(dpy, wwin->client_win, w_global.atom.wmaker.state,
 			w_global.atom.wmaker.state, 32, PropModeReplace, (unsigned char *)data, 10);
+
+	if (wwin->mark_key_label != NULL)
+		XChangeProperty(dpy, wwin->client_win, w_global.atom.wmaker.mark_key,
+					XA_STRING, 8, PropModeReplace,
+					(unsigned char *)wwin->mark_key_label,
+					strlen(wwin->mark_key_label));
+	else
+		XDeleteProperty(dpy, wwin->client_win, w_global.atom.wmaker.mark_key);
 }
 
 static int getSavedState(Window window, WSavedState ** state)
@@ -2476,6 +2589,7 @@ static int getSavedState(Window window, WSavedState ** state)
 	unsigned long nitems_ret;
 	unsigned long bytes_after_ret;
 	long *data;
+	unsigned char *mk_data = NULL;
 
 	if (XGetWindowProperty(dpy, window, w_global.atom.wmaker.state, 0, 10,
 			       True, w_global.atom.wmaker.state,
@@ -2502,6 +2616,15 @@ static int getSavedState(Window window, WSavedState ** state)
 	(*state)->window_shortcuts = data[9];
 
 	XFree(data);
+
+	(*state)->mark_key = NULL;
+	if (XGetWindowProperty(dpy, window, w_global.atom.wmaker.mark_key, 0, 256,
+							True, XA_STRING, &type_ret, &fmt_ret, &nitems_ret, &bytes_after_ret,
+							&mk_data) == Success && mk_data && nitems_ret > 0 && type_ret == XA_STRING)
+		(*state)->mark_key = wstrdup((char *)mk_data);
+
+	if (mk_data)
+		XFree(mk_data);
 
 	return 1;
 }
@@ -2626,6 +2749,11 @@ void wWindowSetKeyGrabs(WWindow * wwin)
 
 		if (key->keycode == 0)
 			continue;
+
+		/* WKBD_KEYCHAIN_CANCEL is only meaningful while inside an active key chain */
+		if (i == WKBD_KEYCHAIN_CANCEL)
+			continue;
+
 		if (key->modifier != AnyModifier) {
 			XGrabKey(dpy, key->keycode, key->modifier | LockMask,
 				 wwin->frame->core->window, True, GrabModeAsync, GrabModeAsync);
@@ -2729,20 +2857,6 @@ WMagicNumber wWindowAddSavedState(const char *instance, const char *class,
 	return wstate;
 }
 
-static inline int is_same(const char *x, const char *y)
-{
-	if ((x == NULL) && (y == NULL))
-		return 1;
-
-	if ((x == NULL) || (y == NULL))
-		return 0;
-
-	if (strcmp(x, y) == 0)
-		return 1;
-	else
-		return 0;
-}
-
 WMagicNumber wWindowGetSavedState(Window win)
 {
 	char *instance, *class, *command = NULL;
@@ -2757,9 +2871,9 @@ WMagicNumber wWindowGetSavedState(Window win)
 
 	if (PropGetWMClass(win, &class, &instance)) {
 		while (wstate) {
-			if (is_same(instance, wstate->instance) &&
-			    is_same(class, wstate->class) &&
-			    is_same(command, wstate->command)) {
+			if (WMStrEqual(instance, wstate->instance) &&
+			    WMStrEqual(class, wstate->class) &&
+			    WMStrEqual(command, wstate->command)) {
 				break;
 			}
 			wstate = wstate->next;
@@ -2838,6 +2952,9 @@ static void release_wwindowstate(WWindowState *wstate)
 	if (wstate->command)
 		wfree(wstate->command);
 
+	if (wstate->state && wstate->state->mark_key)
+		wfree(wstate->state->mark_key);
+
 	wfree(wstate->state);
 	wfree(wstate);
 }
@@ -2850,6 +2967,29 @@ void wWindowSetOmnipresent(WWindow *wwin, Bool flag)
 	wwin->flags.omnipresent = flag;
 	WMPostNotificationName(WMNChangedState, wwin, "omnipresent");
 }
+
+void wWindowSetMark(WWindow *wwin, const char *label)
+{
+	/* Remove any previous mark first */
+	if (wwin->mark_key_label != NULL)
+		wWindowUnsetMark(wwin);
+
+	wwin->mark_key_label = wstrdup(label);
+
+	UpdateSwitchMenu(wwin->screen_ptr, wwin, ACTION_CHANGE);
+}
+
+void wWindowUnsetMark(WWindow *wwin)
+{
+	if (wwin->mark_key_label == NULL)
+		return;
+
+	wfree(wwin->mark_key_label);
+	wwin->mark_key_label = NULL;
+
+	UpdateSwitchMenu(wwin->screen_ptr, wwin, ACTION_CHANGE);
+}
+
 
 static void resizebarMouseDown(WCoreWindow *sender, void *data, XEvent *event)
 {
@@ -2985,7 +3125,7 @@ static void frameMouseDown(WObjDescriptor *desc, XEvent *event)
 
 	CloseWindowMenu(wwin->screen_ptr);
 
-	if (!(event->xbutton.state & ControlMask) && !WFLAGP(wwin, no_focusable))
+	if ((wPreferences.mouse_wheel_focus || (event->xbutton.button != Button4 && event->xbutton.button != Button5)) && !(event->xbutton.state & ControlMask) && !WFLAGP(wwin, no_focusable))
 		wSetFocusTo(wwin->screen_ptr, wwin);
 
 	if (event->xbutton.button == Button1)
@@ -3141,6 +3281,37 @@ static void windowCloseDblClick(WCoreWindow *sender, void *data, XEvent *event)
 }
 
 #ifdef XKB_BUTTON_HINT
+/* Helper function to extract the 2-letter language code for a given XKB group index */
+void wWindowGetLanguageLabel(int group_index, char *label)
+{
+	XkbRF_VarDefsRec vd;
+	/* Default to empty - will fallback to pixmap if we can't get the label */
+	label[0] = '\0';
+
+	if (XkbRF_GetNamesProp(dpy, NULL, &vd) && vd.layout) {
+		int i;
+		char *layout_list = strdup(vd.layout);
+		char *tok = strtok(layout_list, ",");
+
+		/* Iterate to the requested group index */
+		for (i = 0; i < group_index && tok != NULL; i++) {
+			tok = strtok(NULL, ",");
+		}
+
+		if (tok) {
+			/* Copy exactly the first two bytes, then format: first uppercase, second lowercase */
+			strncpy(label, tok, 2);
+			label[2] = '\0';
+			if (label[0])
+				label[0] = (char) toupper((unsigned char) label[0]);
+			if (label[1])
+				label[1] = (char) tolower((unsigned char) label[1]);
+		}
+
+		free(layout_list);
+	}
+}
+
 static void windowLanguageClick(WCoreWindow *sender, void *data, XEvent *event)
 {
 	WWindow *wwin = data;
@@ -3154,11 +3325,45 @@ static void windowLanguageClick(WCoreWindow *sender, void *data, XEvent *event)
 	if (event->xbutton.button != Button1 && event->xbutton.button != Button3)
 		return;
 	tl = wwin->frame->languagemode;
-	wwin->frame->languagemode = wwin->frame->last_languagemode;
-	wwin->frame->last_languagemode = tl;
+
+	/* Try to advance to the next available XKB group */
+	XkbDescPtr desc = XkbGetKeyboard(dpy, XkbAllComponentsMask, XkbUseCoreKbd);
+	int newgroup = -1;
+	if (desc && desc->names) {
+		int i;
+		const int MAX_GROUPS = 4; /* typical XKB max groups */
+		for (i = 1; i <= MAX_GROUPS; i++) {
+			int cand = (tl + i) % MAX_GROUPS;
+			Atom a = desc->names->groups[cand];
+			if (a != None) {
+				/* Use XGetAtomName to ensure the atom actually has a name */
+				char *nm = XGetAtomName(dpy, a);
+				if (nm && nm[0] != '\0') {
+					newgroup = cand;
+					XFree(nm);
+					break;
+				}
+				if (nm)
+					XFree(nm);
+			}
+		}
+	}
+
+	if (newgroup >= 0) {
+		wwin->frame->last_languagemode = tl;
+		wwin->frame->languagemode = newgroup;
+		XkbLockGroup(dpy, XkbUseCoreKbd, wwin->frame->languagemode);
+	} else {
+		/* fallback to previous toggle behaviour for setups with only two
+		 * groups or when group info is not available */
+		wwin->frame->languagemode = wwin->frame->last_languagemode;
+		wwin->frame->last_languagemode = tl;
+		XkbLockGroup(dpy, XkbUseCoreKbd, wwin->frame->languagemode);
+	}
+	/* Update label */
+	wWindowGetLanguageLabel(wwin->frame->languagemode, wwin->frame->language_label);
+
 	wSetFocusTo(scr, wwin);
-	wwin->frame->languagebutton_image =
-	    wwin->frame->screen_ptr->b_pixmaps[WBUT_XKBGROUP1 + wwin->frame->languagemode];
 	wFrameWindowUpdateLanguageButton(wwin->frame);
 	if (event->xbutton.button == Button3)
 		return;

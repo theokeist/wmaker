@@ -16,8 +16,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -55,7 +54,11 @@
 #define UPDATE_TEXT_FIELD	2
 #define REVERT_TO_DEFAULT	4
 #define PWIDTH			290
+#ifdef XKB_BUTTON_HINT
+#define PHEIGHT			380
+#else
 #define PHEIGHT			360
+#endif
 #define UNDEFINED_POS		0xffffff
 #define UPDATE_DEFAULTS		1
 #define IS_BOOLEAN		2
@@ -504,33 +507,6 @@ static int showIconFor(WMScreen *scrPtr, InspectorPanel *panel, const char *wm_i
 	return 0;
 }
 
-static int getBool(WMPropList *value)
-{
-	char *val;
-
-	if (!WMIsPLString(value))
-		return 0;
-
-	val = WMGetFromPLString(value);
-	if (val == NULL)
-		return 0;
-
-	if ((val[1] == '\0' &&
-	     (val[0] == 'y' || val[0] == 'Y' || val[0] == 'T' ||
-	      val[0] == 't' || val[0] == '1')) ||
-	     (strcasecmp(val, "YES") == 0 || strcasecmp(val, "TRUE") == 0)) {
-		return 1;
-	} else if ((val[1] == '\0' &&
-		   (val[0] == 'n' || val[0] == 'N' || val[0] == 'F' ||
-		    val[0] == 'f' || val[0] == '0')) ||
-		   (strcasecmp(val, "NO") == 0 || strcasecmp(val, "FALSE") == 0)) {
-		return 0;
-	} else {
-		wwarning(_("can't convert \"%s\" to boolean"), val);
-		return 0;
-	}
-}
-
 /* Will insert the attribute = value; pair in window's list,
  * if it's different from the defaults.
  * Defaults means either defaults database, or attributes saved
@@ -554,7 +530,7 @@ insertAttribute(WMPropList *dict, WMPropList *window, WMPropList *attr, WMPropLi
 		def_value = ((flags & IS_BOOLEAN) != 0) ? No : EmptyString;
 
 	if (flags & IS_BOOLEAN)
-		update = (getBool(value) != getBool(def_value));
+		update = (WMPLGetBool(value) != WMPLGetBool(def_value));
 	else
 		update = !WMIsPropListEqualTo(value, def_value);
 
@@ -1342,7 +1318,11 @@ static void create_tab_window_advanced(WWindow *wwin, InspectorPanel *panel, int
 	panel->moreFrm = WMCreateFrame(panel->win);
 	WMSetFrameTitle(panel->moreFrm, _("Advanced"));
 	WMMoveWidget(panel->moreFrm, 15, 45);
+#ifdef XKB_BUTTON_HINT
+	WMResizeWidget(panel->moreFrm, frame_width, 285);
+#else
 	WMResizeWidget(panel->moreFrm, frame_width, 265);
+#endif
 
 	for (i = 0; i < wlengthof(advanced_option); i++) {
 		int is_userdef, flag;
@@ -1462,10 +1442,10 @@ static void create_tab_app_specific(WWindow *wwin, InspectorPanel *panel, int fr
 
 		if (WFLAGP(wwin, emulate_appicon)) {
 			WMSetButtonEnabled(panel->appChk[1], False);
-			WMSetButtonEnabled(panel->moreChk[7], True);
+			WMSetButtonEnabled(panel->moreChk[8], True);
 		} else {
 			WMSetButtonEnabled(panel->appChk[1], True);
-			WMSetButtonEnabled(panel->moreChk[7], False);
+			WMSetButtonEnabled(panel->moreChk[8], False);
 		}
 	} else {
 		if ((wwin->transient_for != None && wwin->transient_for != scr->root_win)
@@ -1474,7 +1454,7 @@ static void create_tab_app_specific(WWindow *wwin, InspectorPanel *panel, int fr
 		else
 			tmp = True;
 
-		WMSetButtonEnabled(panel->moreChk[7], tmp);
+		WMSetButtonEnabled(panel->moreChk[8], tmp);
 
 		WMSetPopUpButtonItemEnabled(panel->pagePopUp, 4, False);
 		panel->appFrm = NULL;

@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 #include "wconfig.h"
 
@@ -122,6 +121,44 @@ Bool wGetIconName(Display *dpy, Window win, char **iconname)
 	}
 	*iconname = NULL;
 	return False;
+}
+
+int WMStrEqual(const char *x, const char *y)
+{
+	if ((x == NULL) && (y == NULL))
+		return 1;
+
+	if ((x == NULL) || (y == NULL))
+		return 0;
+
+	return (strcmp(x, y) == 0);
+}
+
+int WMPLGetBool(WMPropList *value)
+{
+	char *val;
+
+	if (!WMIsPLString(value))
+		return 0;
+
+	val = WMGetFromPLString(value);
+	if (val == NULL)
+		return 0;
+
+	if ((val[1] == '\0' &&
+		 (val[0] == 'y' || val[0] == 'Y' || val[0] == 'T' ||
+		  val[0] == 't' || val[0] == '1')) ||
+		(strcasecmp(val, "YES") == 0 || strcasecmp(val, "TRUE") == 0)) {
+		return 1;
+	} else if ((val[1] == '\0' &&
+				(val[0] == 'n' || val[0] == 'N' || val[0] == 'F' ||
+				 val[0] == 'f' || val[0] == '0')) ||
+			   (strcasecmp(val, "NO") == 0 || strcasecmp(val, "FALSE") == 0)) {
+		return 0;
+	} else {
+		wwarning(_("can't convert \"%s\" to boolean"), val);
+		return 0;
+	}
 }
 
 static void eatExpose(void)
@@ -920,6 +957,34 @@ static char *keysymToString(KeySym keysym, unsigned int state)
 }
 #endif
 
+Bool GetCanonicalShortcutLabel(unsigned int modifiers, KeySym ksym, char *buf, size_t bufsz)
+{
+	static const struct { unsigned int mask; const char *name; } mt[] = {
+		{ ShiftMask,   "Shift+"   },
+		{ ControlMask, "Control+" },
+		{ Mod1Mask,    "Mod1+"    },
+		{ Mod2Mask,    "Mod2+"    },
+		{ Mod3Mask,    "Mod3+"    },
+		{ Mod4Mask,    "Mod4+"    },
+		{ Mod5Mask,    "Mod5+"    },
+		{ 0, NULL }
+	};
+	const char *kname = XKeysymToString(ksym);
+	size_t i;
+
+	if (!kname)
+		return False;
+
+	buf[0] = '\0';
+	for (i = 0; mt[i].mask; i++) {
+		if (modifiers & mt[i].mask)
+			wstrlcat(buf, mt[i].name, bufsz);
+	}
+	wstrlcat(buf, kname, bufsz);
+
+	return True;
+}
+
 char *GetShortcutString(const char *shortcut)
 {
 	char *buffer = NULL;
@@ -954,46 +1019,49 @@ char *GetShortcutString(const char *shortcut)
 
 char *GetShortcutKey(WShortKey key)
 {
-	const char *key_name;
-	char buffer[256];
-	char *wr;
+	char buf[MAX_SHORTCUT_LENGTH];
+	char *result, *seg;
+	int step;
 
-	void append_string(const char *text)
-	{
-		const char *string = text;
-
-		while (*string) {
-			if (wr >= buffer + sizeof(buffer) - 1)
-				break;
-			*wr++ = *string++;
-		}
-	}
-
-	void append_modifier(int modifier_index, const char *fallback_name)
-	{
-		if (wPreferences.modifier_labels[modifier_index]) {
-			append_string(wPreferences.modifier_labels[modifier_index]);
-		} else {
-			append_string(fallback_name);
-		}
-	}
-
-	key_name = XKeysymToString(W_KeycodeToKeysym(dpy, key.keycode, 0));
-	if (!key_name)
+	if (!GetCanonicalShortcutLabel(key.modifier,
+				       W_KeycodeToKeysym(dpy, key.keycode, 0),
+				       buf, sizeof(buf)))
 		return NULL;
 
-	wr = buffer;
-	if (key.modifier & ControlMask) append_modifier(1, "Control+");
-	if (key.modifier & ShiftMask)   append_modifier(0, "Shift+");
-	if (key.modifier & Mod1Mask)    append_modifier(2, "Mod1+");
-	if (key.modifier & Mod2Mask)    append_modifier(3, "Mod2+");
-	if (key.modifier & Mod3Mask)    append_modifier(4, "Mod3+");
-	if (key.modifier & Mod4Mask)    append_modifier(5, "Mod4+");
-	if (key.modifier & Mod5Mask)    append_modifier(6, "Mod5+");
-	append_string(key_name);
-	*wr = '\0';
+	/* Convert the leader token to its display string */
+	result = GetShortcutString(buf);
 
-	return GetShortcutString(buffer);
+	/* Append each chain follower separated by a space */
+	for (step = 0; step < key.chain_length - 1; step++) {
+		char *combined;
+
+		if (key.chain_keycodes[step] == 0)
+			break;
+
+		if (!GetCanonicalShortcutLabel(key.chain_modifiers[step],
+					       W_KeycodeToKeysym(dpy, key.chain_keycodes[step], 0),
+					       buf, sizeof(buf)))
+			break;
+
+		seg = GetShortcutString(buf);
+		combined = wstrconcat(result, " ");
+		wfree(result);
+		result = wstrconcat(combined, seg);
+		wfree(combined);
+		wfree(seg);
+	}
+
+	return result;
+}
+
+void wShortKeyFree(WShortKey *key)
+{
+	if (!key)
+		return;
+
+	wfree(key->chain_modifiers);
+	wfree(key->chain_keycodes);
+	memset(key, 0, sizeof(*key));
 }
 
 char *EscapeWM_CLASS(const char *name, const char *class)

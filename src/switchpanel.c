@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -186,13 +185,25 @@ static void addIconForWindow(WSwitchPanel *panel, WMWidget *parent, WWindow *wwi
 {
 	WMFrame *icon = WMCreateFrame(parent);
 	RImage *image = NULL;
+	WApplication *wapp;
 
 	WMSetFrameRelief(icon, WRFlat);
 	WMResizeWidget(icon, icon_tile_size, icon_tile_size);
 	WMMoveWidget(icon, x, y);
 
+	/* Prefer the per-window _NET_WM_ICON so windows that share a
+	 * group leader but ship distinct icons (a browser and its addon
+	 * windows for instance) each show their own image, then fall
+	 * back to the shared application icon so a client with no
+	 * _NET_WM_ICON still picks up whatever the appicon derived from
+	 * WM_HINTS or the user icon database. */
 	if (!WFLAGP(wwin, always_user_icon) && wwin->net_icon_image)
 		image = RRetainImage(wwin->net_icon_image);
+
+	wapp = wApplicationOf(wwin->main_window);
+	if (!image && !WFLAGP(wwin, always_user_icon) && wapp && wapp->app_icon &&
+			wapp->app_icon->icon && wapp->app_icon->icon->file_image)
+		image = RRetainImage(wapp->app_icon->icon->file_image);
 
 	/* get_icon_image() includes the default icon image */
 	if (!image)

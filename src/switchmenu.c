@@ -15,8 +15,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -44,9 +43,55 @@
 	((w)->wm_gnustep_attr->window_level == WMMainMenuWindowLevel || \
 	 (w)->wm_gnustep_attr->window_level == WMSubmenuWindowLevel))
 
+#define MAX_RTEXT_LENGTH (MAX_WORKSPACENAME_WIDTH + MAX_SHORTCUT_LENGTH + 16)
+
 static int initialized = 0;
 static void observer(void *self, WMNotification * notif);
 static void wsobserver(void *self, WMNotification * notif);
+
+static WPixmap *switchMenuIconForWindow(WScreen *scr, WWindow *wwin)
+{
+	RImage *image = NULL;
+	WPixmap *pix;
+	WApplication *wapp;
+	int max_size;
+
+	if (!scr || !wwin)
+		return NULL;
+
+	max_size = WMFontHeight(scr->menu_entry_font) + 2;
+	if (max_size < 12)
+		max_size = 12;
+
+	/* Prefer the actual appicon image when available */
+	wapp = wApplicationOf(wwin->main_window);
+	if (wapp && wapp->app_icon && wapp->app_icon->icon && wapp->app_icon->icon->file_image) {
+		image = RRetainImage(wapp->app_icon->icon->file_image);
+	}
+
+	/* Fall back to _NET_WM_ICON, then the default icon */
+	if (!image && !WFLAGP(wwin, always_user_icon) && wwin->net_icon_image)
+		image = RRetainImage(wwin->net_icon_image);
+	if (!image)
+		image = get_icon_image(scr, wwin->wm_instance, wwin->wm_class, max_size);
+
+	if (!image)
+		return NULL;
+
+	image = wIconValidateIconSize(image, max_size);
+	if (!image)
+		return NULL;
+
+	pix = wmalloc(sizeof(WPixmap));
+	memset(pix, 0, sizeof(WPixmap));
+	RConvertImageMask(scr->rcontext, image, &pix->image, &pix->mask, 128);
+	pix->width = image->width;
+	pix->height = image->height;
+	pix->depth = scr->w_depth;
+
+	RReleaseImage(image);
+	return pix;
+}
 
 /*
  * FocusWindow
@@ -170,6 +215,26 @@ static int menuIndexForWindow(WMenu * menu, WWindow * wwin, int old_pos)
 	return idx;
 }
 
+static void fillRtext(char *buf, size_t bufsz, WWindow *wwin, WScreen *scr)
+{
+	char *mlbl = wwin->mark_key_label ? GetShortcutString(wwin->mark_key_label) : NULL;
+
+	if (IS_OMNIPRESENT(wwin)) {
+		if (mlbl)
+			snprintf(buf, bufsz, "[%s] [*]", mlbl);
+		else
+			snprintf(buf, bufsz, "[*]");
+	} else {
+		if (mlbl)
+			snprintf(buf, bufsz, "[%s] [%s]", mlbl,
+				 scr->workspaces[wwin->frame->workspace]->name);
+		else
+			snprintf(buf, bufsz, "[%s]",
+				 scr->workspaces[wwin->frame->workspace]->name);
+	}
+	wfree(mlbl);
+}
+
 /*
  * Update switch menu
  */
@@ -216,13 +281,11 @@ void UpdateSwitchMenu(WScreen * scr, WWindow * wwin, int action)
 		entry = wMenuInsertCallback(switchmenu, idx, t, focusWindow, wwin);
 		wfree(t);
 
+		entry->icon = switchMenuIconForWindow(scr, wwin);
+
 		entry->flags.indicator = 1;
-		entry->rtext = wmalloc(MAX_WORKSPACENAME_WIDTH + 8);
-		if (IS_OMNIPRESENT(wwin))
-			snprintf(entry->rtext, MAX_WORKSPACENAME_WIDTH, "[*]");
-		else
-			snprintf(entry->rtext, MAX_WORKSPACENAME_WIDTH, "[%s]",
-				 scr->workspaces[wwin->frame->workspace]->name);
+		entry->rtext = wmalloc(MAX_RTEXT_LENGTH);
+		fillRtext(entry->rtext, MAX_RTEXT_LENGTH, wwin, scr);
 
 		if (wwin->flags.hidden) {
 			entry->flags.indicator_type = MI_HIDDEN;
@@ -265,6 +328,8 @@ void UpdateSwitchMenu(WScreen * scr, WWindow * wwin, int action)
 					t = ShrinkString(scr->menu_entry_font, title, MAX_WINDOWLIST_WIDTH);
 					entry->text = t;
 
+					fillRtext(entry->rtext, MAX_RTEXT_LENGTH, wwin, scr);
+
 					wMenuRealize(switchmenu);
 					checkVisibility = 1;
 					break;
@@ -273,18 +338,15 @@ void UpdateSwitchMenu(WScreen * scr, WWindow * wwin, int action)
 					if (entry->rtext) {
 						int idx = -1;
 						char *t, *rt;
+						WPixmap *ipix;
 						int it, ion;
 
-						if (IS_OMNIPRESENT(wwin)) {
-							snprintf(entry->rtext, MAX_WORKSPACENAME_WIDTH, "[*]");
-						} else {
-							snprintf(entry->rtext, MAX_WORKSPACENAME_WIDTH,
-								 "[%s]",
-								 scr->workspaces[wwin->frame->workspace]->name);
-						}
+						fillRtext(entry->rtext, MAX_RTEXT_LENGTH, wwin, scr);
 
 						rt = entry->rtext;
 						entry->rtext = NULL;
+						ipix = entry->icon;
+						entry->icon = NULL;
 						t = entry->text;
 						entry->text = NULL;
 
@@ -300,6 +362,7 @@ void UpdateSwitchMenu(WScreen * scr, WWindow * wwin, int action)
 						entry = wMenuInsertCallback(switchmenu, idx, t, focusWindow, wwin);
 						wfree(t);
 						entry->rtext = rt;
+						entry->icon = ipix;
 						entry->flags.indicator = 1;
 						entry->flags.indicator_type = it;
 						entry->flags.indicator_on = ion;
@@ -354,11 +417,7 @@ static void UpdateSwitchMenuWorkspace(WScreen *scr, int workspace)
 		wwin = (WWindow *) menu->entries[i]->clientdata;
 
 		if (wwin->frame->workspace == workspace && !IS_OMNIPRESENT(wwin)) {
-			if (IS_OMNIPRESENT(wwin))
-				snprintf(menu->entries[i]->rtext, MAX_WORKSPACENAME_WIDTH, "[*]");
-			else
-				snprintf(menu->entries[i]->rtext, MAX_WORKSPACENAME_WIDTH, "[%s]",
-					 scr->workspaces[wwin->frame->workspace]->name);
+			fillRtext(menu->entries[i]->rtext, MAX_RTEXT_LENGTH, wwin, scr);
 			menu->flags.realized = 0;
 		}
 	}

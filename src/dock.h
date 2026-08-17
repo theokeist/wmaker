@@ -16,8 +16,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef WMDOCK_H_
@@ -93,6 +92,7 @@ void wDockDoAutoLaunch(WDock *dock, int workspace);
 void wDockLaunchWithState(WAppIcon *btn, WSavedState *state);
 void wDockSwap(WDock *dock);
 void wDockApplyOpacity(WScreen *scr);
+void wClipSnapToHead(WDock *clip);
 
 #ifdef USE_DOCK_XDND
 int wDockReceiveDNDDrop(WScreen *scr, XEvent *event);

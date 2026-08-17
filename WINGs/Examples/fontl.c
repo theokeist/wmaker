@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include <stdlib.h>
@@ -24,8 +23,9 @@
 #include <WINGs/WINGs.h>
 #include <WINGs/WUtil.h>
 #include <inttypes.h>
+#include <stdnoreturn.h>
 
-void wAbort()
+noreturn void wAbort(void)
 {
 	exit(0);
 }
@@ -40,7 +40,7 @@ void show(WMWidget * self, void *data)
 	WMSetLabelText(l, buf);
 }
 
-void quit(WMWidget * self, void *data)
+noreturn void quit(WMWidget * self, void *data)
 {
 	(void) self;
 	(void) data;

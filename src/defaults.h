@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef WMDEFAULTS_H_
@@ -33,6 +32,7 @@ WDDomain * wDefaultsInitDomain(const char *domain, Bool requireDictionary);
 void wDefaultsMergeGlobalMenus(WDDomain *menuDomain);
 
 void wReadDefaults(WScreen *scr, WMPropList *new_dict);
+void wReadKeybindings(WScreen *scr, WMPropList *dict);
 void wDefaultUpdateIcons(WScreen *scr);
 void wReadStaticDefaults(WMPropList *dict);
 void wDefaultsCheckDomains(void *arg);
@@ -56,5 +56,5 @@ void wDefaultChangeIcon(const char *instance, const char* class, const char *fil
 RImage *get_rimage_from_file(WScreen *scr, const char *file_name, int max_size);
 
 void wDefaultPurgeInfo(const char *instance, const char *class);
-
+void wKeyTreeRebuild(WScreen *scr);	/* Rebuild the key-chain trie from the current key bindings */
 #endif /* WMDEFAULTS_H_ */

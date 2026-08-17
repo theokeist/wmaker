@@ -15,8 +15,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef WINDOWMAKER_H_
@@ -27,6 +26,7 @@
 #include <limits.h>
 #include <WINGs/WINGs.h>
 #include <wraster.h>
+#include "keytree.h"
 
 
 /* class codes */
@@ -394,6 +394,7 @@ extern struct WPreferences {
 	char auto_focus;                   /* focus window when it's mapped */
 	char *icon_back_file;              /* background image for icons */
 	char enforce_icon_margin;          /* auto-shrink icon images */
+	char mouse_wheel_focus;            /* allow focus window with mouse wheel */
 
 	WCoord *root_menu_pos;             /* initial position of the root menu*/
 	WCoord *app_menu_pos;
@@ -409,6 +410,7 @@ extern struct WPreferences {
 	signed char workspace_name_display_position;
 	unsigned int modifier_mask;        /* mask to use as kbd modifier */
 	char *modifier_labels[7];          /* Names of the modifiers */
+	char *modifier_short_labels[9];    /* Short names of the modifiers */
 
 	unsigned int supports_tiff;        /* Use tiff files */
 
@@ -423,6 +425,9 @@ extern struct WPreferences {
 
 	char dont_blink;                   /* do not blink icon selection */
 	char keep_dock_on_primary_head;    /* keep dock on primary head */
+#ifdef USE_RANDR
+	char hotplug_monitor;              /* auto-(de)activate monitors */
+#endif
 
 	/* Appearance options */
 	char new_style;                    /* Use newstyle buttons */
@@ -494,6 +499,8 @@ extern struct WPreferences {
 	int clip_auto_expand_delay;         /* Delay after which the clip will expand when entered */
 	int clip_auto_collapse_delay;       /* Delay after which the clip will collapse when leaved */
 
+	int keychain_timeout_delay;         /* Delay after which a keychain is reset, 0 means disabled */
+
 	RImage *swtileImage;
 	RImage *swbackImage[9];
 
@@ -505,6 +512,7 @@ extern struct WPreferences {
 	int hot_corner_delay;		   /* Delay after which the hot corner is triggered */
 	int hot_corner_edge;		   /* Hot corner edge size */
 	char *hot_corner_actions[4];	   /* Action of each corner */
+	char window_list_app_icons;        /* Show app icons in window list */
 
 	struct {
 #ifdef USE_ICCCM_WMREPLACE
@@ -525,6 +533,7 @@ extern struct WPreferences {
 	Cursor cursor[WCUR_LAST];
 
     int switch_panel_icon_size;               /* icon size in switch panel */
+    char *screenshot_filename_template;       /* strftime format for screenshot filenames */
 
 } wPreferences;
 
@@ -625,6 +634,7 @@ extern struct wmaker_global_variables {
 
 			Atom icon_size;
 			Atom icon_tile;
+			Atom mark_key;
 		} wmaker;
 
 	} atom;
@@ -645,12 +655,10 @@ extern struct wmaker_global_variables {
 		} shape;
 #endif
 
-#ifdef KEEP_XKB_LOCK_STATUS
 		struct {
 			Bool supported;
 			int event_base;
 		} xkb;
-#endif
 
 #ifdef USE_RANDR
 		struct {
@@ -674,6 +682,17 @@ extern struct wmaker_global_variables {
 		 * impact the shortcuts (typically: CapsLock, NumLock, ScrollLock)
 		 */
 		unsigned int modifiers_mask;
+
+		/*
+		 * Key-chain trie cursor.
+		 *
+		 * curpos == NULL  : idle, no active chain.
+		 * curpos != NULL  : inside a chain; curpos points to the last matched
+		 *                   internal node in wKeyTreeRoot.  The next expected
+		 *                   key is one of curpos->first_child's siblings.
+		 */
+		WKeyNode    *curpos;
+		WMHandlerID  chain_timeout_handler; /* non-NULL while chain timer is armed */
 	} shortcut;
 } w_global;
 

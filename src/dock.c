@@ -17,8 +17,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -3150,6 +3149,43 @@ void wDockApplyOpacity(WScreen *scr)
 
 	for (dc = scr->drawers; dc != NULL; dc = dc->next)
 		applyDockOpacityToDock(dc->adrawer);
+}
+
+/* Snap a clip back onto a visible head after a RandR reconfiguration,
+ * preserving its relative position within that head */
+void wClipSnapToHead(WDock *clip)
+{
+	WScreen *scr = clip->screen_ptr;
+	WMRect rect, head;
+	float rel_x, rel_y;
+	int x = clip->x_pos;
+	int y = clip->y_pos;
+
+	/* Already fully on a visible head, nothing to do */
+	if (!wScreenKeepInside(scr, &x, &y, ICON_SIZE, ICON_SIZE))
+		return;
+
+	rect.pos.x = clip->x_pos;
+	rect.pos.y = clip->y_pos;
+	rect.size.width  = ICON_SIZE;
+	rect.size.height = ICON_SIZE;
+
+	/* Find the nearest remaining head to the clip's old position */
+	head = wGetRectForHead(scr, wGetHeadForRect(scr, rect));
+
+	/* Compute fractional position within that head and clamp to [0..1] */
+	rel_x = (float)(clip->x_pos - head.pos.x) / (float)head.size.width;
+	rel_y = (float)(clip->y_pos - head.pos.y) / (float)head.size.height;
+
+	if (rel_x < 0.0f) rel_x = 0.0f;
+	else if (rel_x > 1.0f) rel_x = 1.0f;
+	if (rel_y < 0.0f) rel_y = 0.0f;
+	else if (rel_y > 1.0f) rel_y = 1.0f;
+
+	x = head.pos.x + (int)(rel_x * (head.size.width  - ICON_SIZE));
+	y = head.pos.y + (int)(rel_y * (head.size.height - ICON_SIZE));
+
+	moveDock(clip, x, y);
 }
 
 static pid_t execCommand(WAppIcon *btn, const char *command, WSavedState *state)

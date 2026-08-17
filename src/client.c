@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 #include "wconfig.h"
 
@@ -245,6 +244,20 @@ void wClientConfigure(WWindow * wwin, XConfigureRequestEvent * xcre)
 			wwin->flags.maximized &= ~(MAX_VERTICAL | MAX_LEFTHALF | MAX_RIGHTHALF | MAX_MAXIMUS | MAX_CENTRAL);
 
 		wWindowConstrainSize(wwin, (unsigned int *)&nwidth, (unsigned int *)&nheight);
+
+		/* Ignore tiny position adjustments from client ConfigureRequests to prevent
+		 * window jitters (e.g., VirtualBox sending incremental 1-2px corrections). */
+		if (wwin->flags.mapped && !wwin->moveresize.active && (xcre->value_mask & (CWX | CWY))) {
+			int dx = abs(nx - wwin->frame_x);
+			int dy = abs(ny - wwin->frame_y);
+
+			if (dx < 3 && dy < 3) {
+				/* Keep current position */
+				nx = wwin->frame_x;
+				ny = wwin->frame_y;
+			}
+		}
+
 		wWindowConfigure(wwin, nx, ny, nwidth, nheight);
 		wwin->old_geometry.x = nx;
 		wwin->old_geometry.y = ny;

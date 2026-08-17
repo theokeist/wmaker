@@ -49,6 +49,8 @@ wmaker_SOURCES = 	\
 	icon.c \
 	icon.h \
 	keybind.h \
+	keytree.c \
+	keytree.h \
 	main.c \
 	main.h \
 	menu.c \
@@ -63,6 +65,8 @@ wmaker_SOURCES = 	\
 	placement.h \
 	properties.c \
 	properties.h \
+	randr.c \
+	randr.h \
 	resources.c \
 	resources.h \
 	rootmenu.c \
@@ -168,6 +172,7 @@ wmaker_LDADD = \
 	@XLFLAGS@ \
 	@LIBXRANDR@ \
 	@LIBXINERAMA@ \
+	@LIBXKBFILE@ \
 	@XLIBS@ \
 	@LIBM@ \
 	@INTLIBS@
@@ -197,8 +202,7 @@ defaults-callbacks-dynamic:
 		--source "$(srcdir)/defaults.c" --structure "optionList"  \
 		--field-value-ptr 4 --field-callback 5  \
 		--struct-def "wPreferences=$(srcdir)/WindowMaker.h"  \
-		--struct-def "legacy_minipreview_config=$(srcdir)/defaults.c"  \
-		--callback "getBool=char, getEnum=char, getInt=int"  \
+		--callback "getBool=char, getEnum=char, getInt=int, getString=char*"  \
 		--callback "getPathList=char*, getCoord=WCoord"
 
 startup-compositor-signature:

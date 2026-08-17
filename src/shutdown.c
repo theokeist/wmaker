@@ -14,8 +14,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
@@ -36,6 +35,7 @@
 #include "winspector.h"
 #include "wmspec.h"
 #include "colormap.h"
+#include "screen.h"
 #include "shutdown.h"
 
 
@@ -81,6 +81,7 @@ void Shutdown(WShutdownMode mode)
 					wipeDesktop(scr);
 				else
 					RestoreDesktop(scr);
+				wScreenDestroy(scr);
 			}
 		}
 		ExecExitScript();
@@ -103,6 +104,7 @@ void Shutdown(WShutdownMode mode)
 					kill(scr->helper_pid, SIGKILL);
 				wScreenSaveState(scr);
 				RestoreDesktop(scr);
+				wScreenDestroy(scr);
 			}
 		}
 		break;

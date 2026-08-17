@@ -14,11 +14,11 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #include "wconfig.h"
+#include "wmspec.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -485,11 +485,10 @@ static void drawTransparentFrame(WWindow * wwin, int x, int y, int width, int he
 	GC gc = wwin->screen_ptr->frame_gc;
 	int h = 0;
 	int bottom = 0;
+	int fb = 0;
 
-	if (HAS_BORDER_WITH_SELECT(wwin)) {
-		x += wwin->screen_ptr->frame_border_width;
-		y += wwin->screen_ptr->frame_border_width;
-	}
+	if (HAS_BORDER_WITH_SELECT(wwin))
+		fb = wwin->screen_ptr->frame_border_width;
 
 	if (HAS_TITLEBAR(wwin) && !wwin->flags.shaded) {
 		h = WMFontHeight(wwin->screen_ptr->title_font) + (wPreferences.window_title_clearance +
@@ -506,13 +505,13 @@ static void drawTransparentFrame(WWindow * wwin, int x, int y, int width, int he
 		   (e.g. interactive placement), frame does not point to anything. */
 		bottom = RESIZEBAR_HEIGHT;
 	}
-	XDrawRectangle(dpy, root, gc, x - 1, y - 1, width + 1, height + 1);
+	XDrawRectangle(dpy, root, gc, x, y, width - 1 + 2 * fb, height - 1 + 2 * fb);
 
 	if (h > 0) {
-		XDrawLine(dpy, root, gc, x, y + h - 1, x + width, y + h - 1);
+		XDrawLine(dpy, root, gc, x, y + fb + h - 1, x + 2 * fb + width, y + fb + h - 1);
 	}
 	if (bottom > 0) {
-		XDrawLine(dpy, root, gc, x, y + height - bottom, x + width, y + height - bottom);
+		XDrawLine(dpy, root, gc, x, y + fb + height - bottom, x + 2 * fb + width, y + fb + height - bottom);
 	}
 }
 
@@ -1228,7 +1227,7 @@ updateWindowPosition(WWindow * wwin, MoveData * data, Bool doResistance,
 static void draw_snap_frame(WWindow *wwin, int direction)
 {
 	WScreen *scr;
-	int head, x, y;
+	int head, x, y, fb;
 	unsigned int width, height;
 	WMRect rect;
 
@@ -1240,6 +1239,7 @@ static void draw_snap_frame(WWindow *wwin, int direction)
 	y = rect.pos.y;
 	width = rect.size.width;
 	height = rect.size.height;
+	fb = HAS_BORDER_WITH_SELECT(wwin) ? 2 * wwin->screen_ptr->frame_border_width : 0;
 
 	switch (direction) {
 	case SNAP_LEFT:
@@ -1286,7 +1286,7 @@ static void draw_snap_frame(WWindow *wwin, int direction)
 		break;
 	}
 
-	drawTransparentFrame(wwin, x, y, width, height);
+	drawTransparentFrame(wwin, x, y, width - fb, height - fb);
 }
 
 static int get_snap_direction(WScreen *scr, int x, int y)
@@ -1946,7 +1946,7 @@ int wMouseMoveWindow(WWindow * wwin, XEvent * ev)
 			break;
 
 		case ButtonRelease:
-			if (event.xbutton.button != ev->xbutton.button)
+			if (!wwin->moveresize.active && (event.xbutton.button != ev->xbutton.button))
 				break;
 
 			if (started) {
@@ -1994,6 +1994,10 @@ int wMouseMoveWindow(WWindow * wwin, XEvent * ev)
 					/* get rid of the geometry window */
 					WMUnmapWidget(scr->gview);
 				}
+			}
+			if (wwin->moveresize.active) {
+				XUngrabPointer(dpy, CurrentTime);
+				wwin->moveresize.active = 0;
 			}
 			done = True;
 			break;
@@ -2132,8 +2136,13 @@ void wMouseResizeWindow(WWindow * wwin, XEvent * ev)
 		wwarning("internal error: tryein");
 		return;
 	}
-	orig_x = ev->xbutton.x_root;
-	orig_y = ev->xbutton.y_root;
+	if (ev->type == MotionNotify) {
+		orig_x = ev->xmotion.x_root;
+		orig_y = ev->xmotion.y_root;
+	} else {
+		orig_x = ev->xbutton.x_root;
+		orig_y = ev->xbutton.y_root;
+	}
 
 	started = 0;
 	wUnselectWindows(scr);
@@ -2143,6 +2152,29 @@ void wMouseResizeWindow(WWindow * wwin, XEvent * ev)
 	ry2 = fy + fh - 1;
 	shiftl = XKeysymToKeycode(dpy, XK_Shift_L);
 	shiftr = XKeysymToKeycode(dpy, XK_Shift_R);
+
+	if (wwin->moveresize.active) {
+		int direction = wwin->moveresize.resize_edge;
+
+		res = 0;
+		is_resizebar = 0;
+		if (direction == _NET_WM_MOVERESIZE_SIZE_TOP)
+			res |= UP;
+		else if (direction == _NET_WM_MOVERESIZE_SIZE_BOTTOM)
+			res |= DOWN;
+		else if (direction == _NET_WM_MOVERESIZE_SIZE_LEFT)
+			res |= LEFT;
+		else if (direction == _NET_WM_MOVERESIZE_SIZE_RIGHT)
+			res |= RIGHT;
+		else if (direction == _NET_WM_MOVERESIZE_SIZE_TOPLEFT)
+			res |= (UP | LEFT);
+		else if (direction == _NET_WM_MOVERESIZE_SIZE_TOPRIGHT)
+			res |= (UP | RIGHT);
+		else if (direction == _NET_WM_MOVERESIZE_SIZE_BOTTOMLEFT)
+			res |= (DOWN | LEFT);
+		else if (direction == _NET_WM_MOVERESIZE_SIZE_BOTTOMRIGHT)
+			res |= (DOWN | RIGHT);
+	}
 
 	while (1) {
 		WMMaskEvent(dpy, KeyPressMask | ButtonMotionMask
@@ -2300,7 +2332,7 @@ void wMouseResizeWindow(WWindow * wwin, XEvent * ev)
 			break;
 
 		case ButtonRelease:
-			if (event.xbutton.button != ev->xbutton.button)
+			if (!wwin->moveresize.active && (event.xbutton.button != ev->xbutton.button))
 				break;
 
 			if (started) {
@@ -2322,6 +2354,11 @@ void wMouseResizeWindow(WWindow * wwin, XEvent * ev)
 				wWindowConfigure(wwin, fx, fy, fw, fh - vert_border);
 				wWindowSynthConfigureNotify(wwin);
 			}
+			if (wwin->moveresize.active) {
+				XUngrabPointer(dpy, CurrentTime);
+				wwin->moveresize.active = 0;
+			}
+
 			return;
 
 		default:

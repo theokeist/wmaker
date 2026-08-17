@@ -16,8 +16,7 @@
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License along
- *  with this program; if not, write to the Free Software Foundation, Inc.,
- *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ *  with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 /*
@@ -97,6 +96,7 @@ static WMPropList *sMaximized;
 static WMPropList *sHidden;
 static WMPropList *sGeometry;
 static WMPropList *sShortcutMask;
+static WMPropList *sMarkKey;
 
 static WMPropList *sDock;
 static WMPropList *sYes, *sNo;
@@ -118,38 +118,10 @@ static void make_keys(void)
 	sGeometry = WMCreatePLString("Geometry");
 	sDock = WMCreatePLString("Dock");
 	sShortcutMask = WMCreatePLString("ShortcutMask");
+	sMarkKey = WMCreatePLString("MarkKey");
 
 	sYes = WMCreatePLString("Yes");
 	sNo = WMCreatePLString("No");
-}
-
-static int getBool(WMPropList * value)
-{
-	char *val;
-
-	if (!WMIsPLString(value)) {
-		return 0;
-	}
-	val = WMGetFromPLString(value);
-	if (val == NULL)
-		return 0;
-
-	if ((val[1] == '\0' && (val[0] == 'y' || val[0] == 'Y'))
-	    || strcasecmp(val, "YES") == 0) {
-
-		return 1;
-	} else if ((val[1] == '\0' && (val[0] == 'n' || val[0] == 'N'))
-		   || strcasecmp(val, "NO") == 0) {
-		return 0;
-	} else {
-		int i;
-		if (sscanf(val, "%i", &i) == 1) {
-			return (i != 0);
-		} else {
-			wwarning(_("can't convert \"%s\" to boolean"), val);
-			return 0;
-		}
-	}
 }
 
 static unsigned getInt(WMPropList * value)
@@ -194,6 +166,7 @@ static WMPropList *makeWindowState(WWindow * wwin, WApplication * wapp)
 	WMPropList *win_state, *cmd, *name, *workspace;
 	WMPropList *shaded, *miniaturized, *maximized, *hidden, *geometry;
 	WMPropList *dock, *shortcut;
+	WMPropList *mark_key_pl = NULL;
 
 	if (wwin->orig_main_window != None && wwin->orig_main_window != wwin->client_win)
 		win = wwin->orig_main_window;
@@ -210,8 +183,11 @@ static WMPropList *makeWindowState(WWindow * wwin, WApplication * wapp)
 	}
 
 	if (PropGetWMClass(win, &class, &instance)) {
-		if (class && instance)
-			snprintf(buffer, sizeof(buffer), "%s.%s", instance, class);
+		if (class && instance) {
+			if (class[0] == '\0' && wwin->wm_class && wwin->wm_class[0] != '\0')
+				class = strdup(wwin->wm_class);
+			snprintf(buffer, sizeof(buffer), "%s%s%s", instance, class[0] ? "." : "", class);
+		}
 		else if (instance)
 			snprintf(buffer, sizeof(buffer), "%s", instance);
 		else if (class)
@@ -241,6 +217,9 @@ static WMPropList *makeWindowState(WWindow * wwin, WApplication * wapp)
 		snprintf(buffer, sizeof(buffer), "%u", mask);
 		shortcut = WMCreatePLString(buffer);
 
+		if (wwin->mark_key_label)
+			mark_key_pl = WMCreatePLString(wwin->mark_key_label);
+
 		win_state = WMCreatePLDictionary(sName, name,
 						 sCommand, cmd,
 						 sWorkspace, workspace,
@@ -249,6 +228,11 @@ static WMPropList *makeWindowState(WWindow * wwin, WApplication * wapp)
 						 sMaximized, maximized,
 						 sHidden, hidden,
 						 sShortcutMask, shortcut, sGeometry, geometry, NULL);
+
+		if (mark_key_pl) {
+			WMPutInPLDictionary(win_state, sMarkKey, mark_key_pl);
+			WMReleasePropList(mark_key_pl);
+		}
 
 		WMReleasePropList(name);
 		WMReleasePropList(cmd);
@@ -423,11 +407,11 @@ static WSavedState *getWindowState(WScreen * scr, WMPropList * win_state)
 
 	value = WMGetFromPLDictionary(win_state, sShaded);
 	if (value != NULL)
-		state->shaded = getBool(value);
+		state->shaded = WMPLGetBool(value);
 
 	value = WMGetFromPLDictionary(win_state, sMiniaturized);
 	if (value != NULL)
-		state->miniaturized = getBool(value);
+		state->miniaturized = WMPLGetBool(value);
 
 	value = WMGetFromPLDictionary(win_state, sMaximized);
 	if (value != NULL) {
@@ -436,12 +420,19 @@ static WSavedState *getWindowState(WScreen * scr, WMPropList * win_state)
 
 	value = WMGetFromPLDictionary(win_state, sHidden);
 	if (value != NULL)
-		state->hidden = getBool(value);
+		state->hidden = WMPLGetBool(value);
 
 	value = WMGetFromPLDictionary(win_state, sShortcutMask);
 	if (value != NULL) {
 		mask = getInt(value);
 		state->window_shortcuts = mask;
+	}
+
+	value = WMGetFromPLDictionary(win_state, sMarkKey);
+	if (value != NULL && WMIsPLString(value)) {
+		char *s = WMGetFromPLString(value);
+		if (s && *s)
+			state->mark_key = wstrdup(s);
 	}
 
 	value = WMGetFromPLDictionary(win_state, sGeometry);
@@ -454,20 +445,6 @@ static WSavedState *getWindowState(WScreen * scr, WMPropList * win_state)
 	}
 
 	return state;
-}
-
-static inline int is_same(const char *x, const char *y)
-{
-	if ((x == NULL) && (y == NULL))
-		return 1;
-
-	if ((x == NULL) || (y == NULL))
-		return 0;
-
-	if (strcmp(x, y) == 0)
-		return 1;
-	else
-		return 0;
 }
 
 void wSessionRestoreState(WScreen *scr)
@@ -556,9 +533,9 @@ void wSessionRestoreState(WScreen *scr)
 		if (dock != NULL) {
 			for (j = 0; j < dock->max_icons; j++) {
 				btn = dock->icon_array[j];
-				if (btn && is_same(instance, btn->wm_instance) &&
-				    is_same(class, btn->wm_class) &&
-				    is_same(command, btn->command) &&
+				if (btn && WMStrEqual(instance, btn->wm_instance) &&
+				    WMStrEqual(class, btn->wm_class) &&
+				    WMStrEqual(command, btn->command) &&
 				    !btn->launching) {
 					found = 1;
 					break;
@@ -571,6 +548,8 @@ void wSessionRestoreState(WScreen *scr)
 		} else if ((pid = execCommand(scr, command)) > 0) {
 			wWindowAddSavedState(instance, class, command, pid, state);
 		} else {
+			if (state->mark_key)
+				wfree(state->mark_key);
 			wfree(state);
 		}
 
