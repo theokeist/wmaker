@@ -1118,12 +1118,12 @@ static Bool build_compositor_command(int choice, const char *quoted_config, char
         case WCOMPOSITOR_PICOM:
                 if (quoted_config) {
                         n = snprintf(command, command_size,
-                                     "picom --backend glx --config %s --experimental-backends --animations%s",
+                                     "picom --backend glx --config %s%s -b",
                                      quoted_config,
                                      wPreferences.enable_window_shadows ? " --shadow" : "");
                 } else {
                         n = snprintf(command, command_size,
-                                     "picom --backend glx --experimental-backends --animations%s",
+                                     "picom --backend glx%s -b",
                                      wPreferences.enable_window_shadows ? " --shadow" : "");
                 }
                 break;

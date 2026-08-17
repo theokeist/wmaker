@@ -3,4 +3,7 @@ Name=Window Maker
 Comment=This session logs you into Window Maker
 Exec=wmaker
 TryExec=wmaker
+Type=Application
 DesktopNames=WindowMaker
+Keywords=wmaker;windowmaker;window manager;
+Icon=wmaker

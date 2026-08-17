@@ -75,6 +75,10 @@
 	OpaqueResize = NO;
 	OpaqueMoveResizeKeyboard = NO;
 	DisableAnimations = NO;
+	AutostartCompositor = YES;
+	PreferredCompositor = Picom;
+	CompositorConfigPath = "~/.config/picom/picom.conf";
+	EnableWindowShadows = YES;
 	DontLinkWorkspaces = YES;
 	WindowSnapping = NO;
 	SnapEdgeDetect = 1;

@@ -211,6 +211,7 @@ subdir('wmlib')
 subdir('src')
 subdir('WPrefs.app')
 subdir('util')
+subdir('WindowMaker')
 
 summary({
   'prefix': get_option('prefix'),

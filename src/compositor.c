@@ -92,12 +92,12 @@ Bool wCompositorBuildLaunchCommand(const WCompositorBackend *backend,
         if (backend->choice == WCOMPOSITOR_PICOM) {
                 if (config_argument && config_argument[0]) {
                         snprintf(buffer, buflen,
-                                 "%s --backend glx --config %s --experimental-backends --animations%s",
+                                 "%s --backend glx --config %s%s -b",
                                  backend->binary, config_argument,
                                  enable_shadows ? " --shadow" : "");
                 } else {
                         snprintf(buffer, buflen,
-                                 "%s --backend glx --experimental-backends --animations%s",
+                                 "%s --backend glx%s -b",
                                  backend->binary,
                                  enable_shadows ? " --shadow" : "");
                 }

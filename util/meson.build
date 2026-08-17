@@ -113,3 +113,25 @@ executable('wmiv',
   dependencies: wmiv_deps,
   install: true
 )
+
+sed = find_program('sed')
+
+custom_target('wmaker.inst',
+  input: 'wmaker.inst.in',
+  output: 'wmaker.inst',
+  command: [sed,
+    '-e', 's|#pkgdatadir#|' + get_option('prefix') / get_option('datadir') / 'WindowMaker|',
+    '-e', 's|#sysconfdir#|' + get_option('prefix') / get_option('sysconfdir') / 'WindowMaker|',
+    '-e', 's|#version#|' + meson.project_version() + '|',
+    '-e', 's|#bindir#|' + get_option('prefix') / get_option('bindir') + '|',
+    '@INPUT@'],
+  capture: true,
+  install: true,
+  install_mode: 'rwxr-xr-x',
+  install_dir: get_option('bindir')
+)
+
+install_data(['wm-oldmenu2new', 'wkdemenu.pl'],
+  install_mode: 'rwxr-xr-x',
+  install_dir: get_option('bindir')
+)
