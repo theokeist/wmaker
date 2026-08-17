@@ -36,6 +36,7 @@
 #include <pwd.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <ctype.h>
 
 #ifdef USE_XINERAMA
@@ -353,21 +354,17 @@ static BackgroundTexture *parseTexture(RContext * rc, char *text)
 		case 'h':
 		case 'H':
 			gtype = RHorizontalGradient;
-			iwidth = scrWidth;
-			iheight = 32;
 			break;
 		case 'V':
 		case 'v':
 			gtype = RVerticalGradient;
-			iwidth = 32;
-			iheight = scrHeight;
 			break;
 		default:
 			gtype = RDiagonalGradient;
-			iwidth = scrWidth;
-			iheight = scrHeight;
 			break;
 		}
+		iwidth = scrWidth;
+		iheight = scrHeight;
 
 		image = RRenderGradient(iwidth, iheight, &color1, &color2, gtype);
 
@@ -442,21 +439,17 @@ static BackgroundTexture *parseTexture(RContext * rc, char *text)
 		case 'h':
 		case 'H':
 			gtype = RHorizontalGradient;
-			iwidth = scrWidth;
-			iheight = 32;
 			break;
 		case 'V':
 		case 'v':
 			gtype = RVerticalGradient;
-			iwidth = 32;
-			iheight = scrHeight;
 			break;
 		default:
 			gtype = RDiagonalGradient;
-			iwidth = scrWidth;
-			iheight = scrHeight;
 			break;
 		}
+		iwidth = scrWidth;
+		iheight = scrHeight;
 
 		image = RRenderMultiGradient(iwidth, iheight, colors, gtype);
 
@@ -635,21 +628,17 @@ static BackgroundTexture *parseTexture(RContext * rc, char *text)
 		case 'h':
 		case 'H':
 			gtype = RHorizontalGradient;
-			twidth = scrWidth;
-			theight = image->height > scrHeight ? scrHeight : image->height;
 			break;
 		case 'V':
 		case 'v':
 			gtype = RVerticalGradient;
-			twidth = image->width > scrWidth ? scrWidth : image->width;
-			theight = scrHeight;
 			break;
 		default:
 			gtype = RDiagonalGradient;
-			twidth = scrWidth;
-			theight = scrHeight;
 			break;
 		}
+		twidth = scrWidth;
+		theight = scrHeight;
 		gradient = RRenderGradient(twidth, theight, &color1, &color2, gtype);
 
 		if (!gradient) {
@@ -775,10 +764,13 @@ static void setupTexture(RContext * rc, BackgroundTexture ** textures, int *maxT
 		*maxTextures = workspace;
 }
 
-static Pixmap duplicatePixmap(Pixmap pixmap, int width, int height)
+static Pixmap duplicatePixmap(BackgroundTexture * texture)
 {
 	Display *tmpDpy;
 	Pixmap copyP;
+
+	if (!texture)
+		return None;
 
 	/* must open a new display or the RetainPermanent will
 	 * leave stuff allocated in RContext unallocated after exit */
@@ -790,8 +782,24 @@ static Pixmap duplicatePixmap(Pixmap pixmap, int width, int height)
 	} else {
 		XSync(dpy, False);
 
-		copyP = XCreatePixmap(tmpDpy, root, width, height, DefaultDepth(tmpDpy, scr));
-		XCopyArea(tmpDpy, pixmap, copyP, DefaultGC(tmpDpy, scr), 0, 0, width, height, 0, 0);
+		copyP = XCreatePixmap(tmpDpy, root, scrWidth, scrHeight, DefaultDepth(tmpDpy, scr));
+		if (texture->solid) {
+			XSetForeground(tmpDpy, DefaultGC(tmpDpy, scr), texture->color.pixel);
+			XFillRectangle(tmpDpy, copyP, DefaultGC(tmpDpy, scr), 0, 0, scrWidth, scrHeight);
+		} else if (texture->pixmap != None) {
+			if (texture->width == scrWidth && texture->height == scrHeight) {
+				XCopyArea(tmpDpy, texture->pixmap, copyP, DefaultGC(tmpDpy, scr), 0, 0, scrWidth, scrHeight, 0, 0);
+			} else {
+				XGCValues gcv;
+				GC tileGC;
+
+				gcv.tile = texture->pixmap;
+				gcv.fill_style = FillTiled;
+				tileGC = XCreateGC(tmpDpy, copyP, GCTile | GCFillStyle, &gcv);
+				XFillRectangle(tmpDpy, copyP, tileGC, 0, 0, scrWidth, scrHeight);
+				XFreeGC(tmpDpy, tileGC);
+			}
+		}
 		XSync(tmpDpy, False);
 
 		XSetCloseDownMode(tmpDpy, RetainPermanent);
@@ -894,7 +902,7 @@ static void changeTexture(BackgroundTexture * texture)
 	{
 		Pixmap pixmap;
 
-		pixmap = duplicatePixmap(texture->pixmap, texture->width, texture->height);
+		pixmap = duplicatePixmap(texture);
 
 		setPixmapProperty(pixmap);
 	}
@@ -1035,8 +1043,8 @@ static noreturn void helperLoop(RContext * rc)
 static void updateDomain(const char *domain, const char *key, const char *texture)
 {
 	int result;
-	char *program = "wdwrite";
 	char cmd_smooth[1024];
+	pid_t pid;
 
 	snprintf(cmd_smooth, sizeof(cmd_smooth),
 	         "wdwrite %s SmoothWorkspaceBack %s",
@@ -1045,8 +1053,17 @@ static void updateDomain(const char *domain, const char *key, const char *textur
 	if (result == -1)
 		werror("error executing system(\"%s\")", cmd_smooth);
 
-	execlp(program, program, domain, key, texture, NULL);
-	wwarning("warning could not run \"%s\"", program);
+	pid = fork();
+	if (pid == 0) {
+		execlp("wdwrite", "wdwrite", domain, key, texture, NULL);
+		wwarning("warning could not run \"wdwrite\"");
+		_exit(1);
+	} else if (pid > 0) {
+		int status;
+		waitpid(pid, &status, 0);
+	} else {
+		werror("fork() failed while updating domain");
+	}
 }
 
 static WMPropList *getValueForKey(const char *domain, const char *keyName)
