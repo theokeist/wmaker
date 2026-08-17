@@ -61,6 +61,30 @@ Window Maker has no connection with Windowmaker, the software for making windows
 and doors.
 
 
+Current Status & Modern Enhancements
+====================================
+
+Window Maker is actively maintained with modern enhancements for contemporary
+X11 desktop environments:
+
+* **Compositor & Visual Effects**: Integrated support for Compton and modular
+  X11 compositors. Features automatic configuration template generation,
+  flexible GLX / XRender backends, and in-depth controls within WPrefs.app.
+* **Dock Opacity & Sizing**: Precise dock opacity tuning, multi-head alignment,
+  and improved dock geometry management.
+* **Modern UI & Glass Architecture**: Blueprint for rounded corners, translucent
+  materials, and modern NeXT/Glass styling documented in
+  `doc/GLASS_AND_MODERN_UI_NOTES.md`.
+* **WRaster Image Formats**: Support for next-generation image formats including
+  JPEG XL (JXL) and fast in-memory image encoding/decoding.
+* **WINGs Toolkit Robustness**: Refined font fallback chains, elimination of
+  cursor ghosting and caret offset inaccuracies in `wtextfield`, and full
+  UTF-8 window/icon title handling.
+* **Multi-Distribution & Session Guides**: Up-to-date dependency manifests and
+  compilation workflows for Debian 12/13, Ubuntu 25.10, PCLinuxOS, and ALT Linux,
+  plus streamlined `xinitrc` and display manager session wiring.
+
+
 Documentation
 =============
 
