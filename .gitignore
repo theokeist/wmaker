@@ -140,3 +140,5 @@ WPrefs.app/WPrefs.desktop
 *~
 
 .pc
+build*/
+.ninja*

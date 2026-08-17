@@ -325,9 +325,9 @@ static WMPropList *get_generic_value(const char *instance, const char *class,
 	/* Search the icon name using class and instance */
 	if (class && instance) {
 		char *buffer;
-
-		buffer = wmalloc(strlen(class) + strlen(instance) + 2);
-		sprintf(buffer, "%s.%s", instance, class);
+		size_t buflen = strlen(class) + strlen(instance) + 2;
+		buffer = wmalloc(buflen);
+		snprintf(buffer, buflen, "%s.%s", instance, class);
 		key = WMCreatePLString(buffer);
 		wfree(buffer);
 
@@ -608,8 +608,9 @@ void wDefaultPurgeInfo(const char *instance, const char *class)
 
 	WMPLSetCaseSensitive(True);
 
-	buffer = wmalloc(strlen(class) + strlen(instance) + 2);
-	sprintf(buffer, "%s.%s", instance, class);
+	size_t buflen = strlen(class) + strlen(instance) + 2;
+	buffer = wmalloc(buflen);
+	snprintf(buffer, buflen, "%s.%s", instance, class);
 	key = WMCreatePLString(buffer);
 
 	dict = WMGetFromPLDictionary(w_global.domain.window_attr->dictionary, key);

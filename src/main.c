@@ -511,6 +511,9 @@ static void inotifyWatchConfig(void)
 				   " a restart to take effect."), watchPath);
 			close(w_global.inotify.fd_event_queue);
 			w_global.inotify.fd_event_queue = -1;
+		} else {
+			WMAddInputHandler(w_global.inotify.fd_event_queue, WIReadMask,
+			                  (WMInputProc *)handle_inotify_events_callback, NULL);
 		}
 	}
 	wfree(watchPath);

@@ -159,33 +159,29 @@ static const char *requestCodes[] = {
 
 void FormatXError(Display * dpy, XErrorEvent * error, char *buffer, int size)
 {
-	int i, p;
+	int i;
 
 	XGetErrorText(dpy, error->error_code, buffer, size);
 	i = strlen(buffer);
-	if (i > size - 100)
+	if (i >= size)
 		return;
-	buffer += i;
 	if (error->request_code >= wlengthof(requestCodes)) {
-		sprintf(buffer, "\n	Request code: %i\n", error->request_code);
+		snprintf(buffer + i, size - i, "\n	Request code: %i\n", error->request_code);
 	} else {
-		sprintf(buffer, "\n	Request code: %i %s\n", error->request_code,
+		snprintf(buffer + i, size - i, "\n	Request code: %i %s\n", error->request_code,
 			requestCodes[error->request_code]);
 	}
-	i += p = strlen(buffer);
-	if (i > size - 40)
+	i = strlen(buffer);
+	if (i >= size)
 		return;
-	buffer += p;
-	sprintf(buffer, "	Request minor code: %i\n", error->minor_code);
-	i += p = strlen(buffer);
-	if (i > size - 30)
+	snprintf(buffer + i, size - i, "	Request minor code: %i\n", error->minor_code);
+	i = strlen(buffer);
+	if (i >= size)
 		return;
-	buffer += p;
-	sprintf(buffer, "	Resource ID: 0x%x\n", (unsigned int)error->resourceid);
-	i += p = strlen(buffer);
-	if (i > size - 30)
+	snprintf(buffer + i, size - i, "	Resource ID: 0x%x\n", (unsigned int)error->resourceid);
+	i = strlen(buffer);
+	if (i >= size)
 		return;
-	buffer += p;
-	sprintf(buffer, "	Error serial: %li\n", error->serial);
+	snprintf(buffer + i, size - i, "	Error serial: %li\n", error->serial);
 	return;
 }

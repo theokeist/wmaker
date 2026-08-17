@@ -15,6 +15,10 @@
 # include <sys/select.h>
 #endif
 
+#ifdef HAVE_POLL_H
+# include <poll.h>
+#endif
+
 #include <time.h>
 
 #ifndef X_GETTIMEOFDAY
@@ -372,7 +376,7 @@ void W_CheckTimerHandlers(void)
 Bool W_HandleInputEvents(Bool waitForInput, int inputfd)
 {
 #if defined(HAVE_POLL) && defined(HAVE_POLL_H) && !defined(HAVE_SELECT)
-	struct poll fd *fds;
+	struct pollfd *fds;
 	InputHandler *handler;
 	int count, timeout, nfds, i, extrafd;
 

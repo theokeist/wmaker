@@ -1742,38 +1742,6 @@ static int getPropList(WScreen * scr, WDefaultEntry * entry, WMPropList * value,
         return True;
 }
 
-static int getString(WScreen *scr, WDefaultEntry *entry, WMPropList *value, void *addr, void **ret)
-{
-        const char *val;
-        char *duplicate;
-
-        /* Parameter not used, but tell the compiler that it is ok */
-        (void)scr;
-
-        GET_STRING_OR_DEFAULT("String", val);
-
-        duplicate = wstrdup(val);
-        if (!duplicate)
-                return False;
-
-        if (addr) {
-                char **target = addr;
-
-                if (*target)
-                        wfree(*target);
-                *target = duplicate;
-
-                if (ret)
-                        *ret = *target;
-        } else if (ret) {
-                *ret = duplicate;
-        } else {
-                wfree(duplicate);
-        }
-
-        return True;
-}
-
 static int getPathList(WScreen * scr, WDefaultEntry * entry, WMPropList * value, void *addr, void **ret)
 {
 	static char *data;
